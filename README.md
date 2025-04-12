@@ -1,6 +1,6 @@
 # MoneyPrinterAICreate
 ## 特点
-本广告短视频生成器在GitHub开源项目
+本短视频生成器在GitHub开源项目
 [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo)的基础上，接入了ai文生视频、图生视频作为剪辑素材的功能，素材更加丰富。
 
 ## 工作流程
