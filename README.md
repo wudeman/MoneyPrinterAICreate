@@ -6,6 +6,9 @@
 ## 工作流程
 利用语言大模型生成视频文案和大纲，阿里最新的ai生成视频模型通义万相Wan2.1生成视频素材，最后自动剪辑为带有字幕、配音、配乐的广告短视频。
 
+## 隐私问题
+wan21生成视频功能使用的是官方提供的试用api，上传的图片均会被收集，请注意不要上传个人隐私相关的图片。
+
 ## 使用说明
 1. 按照[MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo)进行部署，若为windows，一键部署后将MoneyPrinterTurbo整个文件夹替换为MoneyPrinterAICreate，并修改start.bat，将MoneyPrinterTurbo改为MoneyPrinterAICreate。
 2. 填写基础设置：
