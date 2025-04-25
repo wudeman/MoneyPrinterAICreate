@@ -1,10 +1,16 @@
 # MoneyPrinterAICreate
 ## 特点
 本短视频生成器在GitHub开源项目
-[MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo)的基础上，接入了ai文生视频、图生视频作为剪辑素材的功能，素材更加丰富。
+[MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo)的基础上，接入了万相通义 wan2.1 ai文生视频、图生视频作为剪辑素材的功能，素材更加丰富。支持分镜大纲与提示词修改，视频生成更可控。
+
+## 界面
+![set](https://github.com/user-attachments/assets/a39740fc-ba78-43a9-91c6-0be32312eef8)
+![script](https://github.com/user-attachments/assets/e527bcc4-d9c8-4ef9-ad75-b182a8e7d009)
+![videoset](https://github.com/user-attachments/assets/9ea38b4a-5341-42ea-b84f-5686ac1bbedc)
+![material](https://github.com/user-attachments/assets/212d630c-df7a-4f76-bd44-2d2e1ae277ad)
 
 ## 工作流程
-利用语言大模型生成视频文案和大纲，阿里最新的ai生成视频模型通义万相Wan2.1生成视频素材，最后自动剪辑为带有字幕、配音、配乐的广告短视频。
+利用语言大模型生成视频文案和大纲、提示词（可人工修改），阿里最新的ai生成视频模型通义万相Wan2.1生成视频素材，最后自动拼接剪辑为带有字幕、配音、配乐的广告短视频。
 
 ## 隐私问题
 wan21生成视频功能使用的是官方提供的试用api，上传的图片均会被收集，请注意不要上传个人隐私相关的图片。
