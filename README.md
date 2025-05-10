@@ -17,12 +17,13 @@ wan21生成视频功能使用的是官方提供的试用api，上传的图片均
 
 ## 使用说明
 1. 按照[MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo)进行部署，若为windows，一键部署后将MoneyPrinterTurbo整个文件夹替换为MoneyPrinterAICreate，并修改start.bat，将MoneyPrinterTurbo改为MoneyPrinterAICreate。
-2. 填写基础设置：
+   免部署百度网盘：https://pan.baidu.com/s/1DRn1OIHxJk43AEWHTq-g6A?pwd=h4g6 提取码: h4g6
+3. 填写基础设置：
    - 大模型提供商  
    - wan21 API key   
         用于视频素材生成。在魔搭社区申请，目前免费使用。  
-3. 填写视频主题
-4. (可选) 填写视频风格，如：搞笑
+4. 填写视频主题
+5. (可选) 填写视频风格，如：搞笑
    
 (视频来源为本地文件，忽略步骤567)  
 
