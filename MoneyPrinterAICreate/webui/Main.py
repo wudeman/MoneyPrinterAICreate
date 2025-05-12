@@ -856,7 +856,9 @@ with (st.container()):
                         outline_current = st.session_state.outline[str(i)]
                         prompt_de = outline_current["prompt"]
                         img_de = f"图片内容参考：{outline_current['img']}"
-                    else:  # 未通过ai生成大纲
+                    else:  # 未通过ai生成分镜
+                        if st.session_state.outline!={}:
+                            logger.warning("分镜解析错误，分镜内容：" + str(st.session_state.outline))
                         prompt_de = ""
                         img_de = "上传图片（可选）"
 
