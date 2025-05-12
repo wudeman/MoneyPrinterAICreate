@@ -1057,7 +1057,9 @@ def azure_tts_v1(
             logger.info(f"start, voice name: {voice_name}, try: {i + 1}")
 
             async def _do() -> SubMaker:
-                communicate = edge_tts.Communicate(text, voice_name, rate=rate_str,proxy="http://127.0.0.1:10809")
+                communicate = edge_tts.Communicate(text, voice_name, rate=rate_str) 
+                # 若有类似连接不上，建议开vpn的提示，开了vpn后尝试添加 proxy="代理url"，如proxy="http://127.0.0.1:10809"
+                # 见：https://github.com/harry0703/MoneyPrinterTurbo/issues/570，https://github.com/q1uki/MoneyPrinterAICreate/issues/5
                 sub_maker = edge_tts.SubMaker()
                 with open(voice_file, "wb") as file:
                     async for chunk in communicate.stream():
