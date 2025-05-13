@@ -51,12 +51,12 @@ hostname = socket.gethostname()
 log_level = _cfg.get("log_level", "DEBUG")
 listen_host = _cfg.get("listen_host", "0.0.0.0")
 listen_port = _cfg.get("listen_port", 8080)
-project_name = _cfg.get("project_name", "MoneyPrinterTurbo")
+project_name = _cfg.get("project_name", "MoneyPrinterAICreate")
 project_description = _cfg.get(
     "project_description",
-    "<a href='https://github.com/harry0703/MoneyPrinterTurbo'>https://github.com/harry0703/MoneyPrinterTurbo</a>",
+    "<a href='https://github.com/q1uki/MoneyPrinterAICreate'>https://github.com/q1uki/MoneyPrinterAICreate</a>",
 )
-project_version = _cfg.get("project_version", "1.2.1")
+project_version = _cfg.get("project_version", "1.0.0")
 reload_debug = False
 
 imagemagick_path = app.get("imagemagick_path", "")

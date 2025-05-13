@@ -24,16 +24,13 @@ import nest_asyncio
 from loguru import logger
 
 st.set_page_config(
-    page_title="MoneyPrinterTurbo-Teyu",
+    page_title="MoneyPrinterAICreate",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="auto",
     menu_items={
         "Report a bug": "https://github.com/q1uki/MoneyPrinterAICreate/issues",
-        "About": "# MoneyPrinterTurbo\nSimply provide a topic or keyword for a video, and it will "
-                 "automatically generate the video copy, video materials, video subtitles, "
-                 "and video background music before synthesizing a high-definition short "
-                 "video.\n\nhttps://github.com/harry0703/MoneyPrinterTurbo",
+        "About": "Based on MoneyPrinterTurbo, AI generates image outline and video (dynamic, not ppt), and integrates wan2.1 text-to-video and image-to-video functions to flexibly control video generation.",
     },
 )
 
@@ -891,7 +888,7 @@ with (st.container()):
                                     method = 't2v'
                                     if uploaded_images is not None:
                                         method = 'i2v'
-                                        image_path = f"temp_image_{i}.png"
+                                        image_path = f"tmp/temp_image_{i}.png"
                                         with open(image_path, "wb") as f:
                                             f.write(uploaded_images.getbuffer())
 

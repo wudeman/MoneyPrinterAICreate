@@ -11,8 +11,7 @@ import asyncio
 
 from app.config import config
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-tmp_path=os.path.join(script_dir, "tmp")
+tmp_path="tmp"
 
 async def check_process(client, method, seg_id):
     while True:
