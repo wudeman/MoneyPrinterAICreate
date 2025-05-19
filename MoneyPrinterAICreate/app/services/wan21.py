@@ -17,7 +17,7 @@ async def check_process(client, method, seg_id):
     while True:
         try:
             process = client.predict(api_name="/get_process_bar")
-            logger.info(f"[seg{seg_id}]-{method}-{process['label']}")
+            logger.info(f"[seg{seg_id+1}]-{method}-{process['label']}")
             if process["value"] == 100:
                 while True:
                     video_path = client.predict(api_name="/process_change")
@@ -26,7 +26,7 @@ async def check_process(client, method, seg_id):
                         src_path = value.get("video")
                         dst_path = os.path.join(tmp_path, f"{str(uuid4())}.mp4")
                         shutil.move(src_path, dst_path)
-                        logger.info(f"[seg{seg_id}]-{method}-[success]-output: {dst_path}")
+                        logger.info(f"[seg{seg_id+1}]-{method}-[success]-output: {dst_path}")
                         break
                     await asyncio.sleep(60)
                 break

@@ -130,14 +130,14 @@ if "event_loop" not in st.session_state:
 
 
 async def predict(i, method, prompt, image_path):
-    logger.debug(f"开始生成素材块 {i}")
+    logger.debug(f"开始生成素材块 {i+1}")
     video_path = await llm.generate_material_video(
         prompt=prompt,
         method=method,
         img=image_path,
         id=i
     )
-    logger.debug(f"素材块 {i} 生成完成")
+    logger.debug(f"素材块 {i+1} 生成完成")
     return video_path
 
 
@@ -297,6 +297,7 @@ if not config.app.get("hide_config", False):
             llm_providers = [
                 "OpenAI",
                 "Moonshot",
+                "Hunyuan",
                 "Azure",
                 "Qwen",
                 "DeepSeek",
@@ -370,6 +371,13 @@ if not config.app.get("hide_config", False):
                            - **Base Url**: 固定为 https://api.moonshot.cn/v1
                            - **Model Name**: 比如 moonshot-v1-8k，[点击查看模型列表](https://platform.moonshot.cn/docs/intro#%E6%A8%A1%E5%9E%8B%E5%88%97%E8%A1%A8)
                            """
+
+            if llm_provider=="hunyuan":
+                if not llm_model_name:
+                    llm_model_name = "hunyuan-standard"
+                if not llm_base_url:
+                    llm_base_url = "https://api.hunyuan.cloud.tencent.com/v1"
+
             if llm_provider == "oneapi":
                 if not llm_model_name:
                     llm_model_name = (
