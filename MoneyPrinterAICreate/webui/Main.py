@@ -61,8 +61,14 @@ page = st.sidebar.radio(
 # 根据选择的页面显示不同内容
 if page == "首页":
     st.title(f"MoneyPrinterAICreate v{config.project_version}")
+    
+    # 以下是首页内容，只在选择首页时显示
+    # 其他页面不会显示这些内容
 elif page == "模型管理":
     model_management_page()
+    # 模型管理页面内容已在model_management_page()函数中定义
+    # 直接返回，不再显示后续首页内容
+    st.stop()
 
 support_locales = [
     "zh-CN",
