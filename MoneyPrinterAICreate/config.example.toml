@@ -192,3 +192,14 @@
     # Get your API key at https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub/~/SpeechServices
     speech_key=""
     speech_region=""
+
+[database]
+    # MySQL Database Configuration
+    host = "192.168.1.11"
+    port = 3306
+    user = "root"
+    password = "90-iopjklnm,"
+    db_name = "media"
+    charset = "utf8mb4"
+    pool_size = 10
+    pool_pre_ping = true

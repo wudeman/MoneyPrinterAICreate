@@ -41,11 +41,28 @@ from app.services import llm, voice
 from app.services import task as tm
 from app.utils import utils
 
+# 导入模型管理页面
+from webui.model_management import model_management_page
+
 hide_streamlit_style = """
 <style>#root > div:nth-child(1) > div > div > div > div > section > div {padding-top: 0rem;}</style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-st.title(f"MoneyPrinterAICreate v{config.project_version}")
+
+# 侧边栏导航
+st.sidebar.title("导航")
+
+# 页面选择
+page = st.sidebar.radio(
+    "选择页面",
+    ("首页", "模型管理")
+)
+
+# 根据选择的页面显示不同内容
+if page == "首页":
+    st.title(f"MoneyPrinterAICreate v{config.project_version}")
+elif page == "模型管理":
+    model_management_page()
 
 support_locales = [
     "zh-CN",
