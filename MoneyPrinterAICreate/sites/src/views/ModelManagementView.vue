@@ -26,8 +26,6 @@
               v-model="searchParams.searchName"
               placeholder="搜索模型名称"
               clearable
-              class="search-input"
-              prefix-icon="Search"
             ></el-input>
             <el-button type="primary" @click="handleSearch">
               查询
@@ -36,8 +34,7 @@
               重置
             </el-button>
             <el-button type="success" @click="handleAddModel">
-              <el-icon><Plus /></el-icon>
-              新增模型
+              新增
             </el-button>
           </div>
         </div>
