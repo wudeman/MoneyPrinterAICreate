@@ -713,9 +713,9 @@ const handleSelectionChange = (val: LLMModel[]) => {
 };
 
 // 组件挂载时获取模型列表
-onMounted(() => {
-  fetchModels();
-});
+  onMounted(() => {
+    fetchModels();
+  });
 </script>
 
 <style scoped>
@@ -729,14 +729,13 @@ onMounted(() => {
 
 .model-list-page {
   width: 100%;
-  max-width: 1400px;
   margin: 0 auto;
 }
-
 .search-filter-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   padding: 16px 20px;
   background-color: #f8f9fa;
   border: 1px solid #e9ecef;
@@ -758,6 +757,12 @@ onMounted(() => {
 
 .search-input {
   width: 200px;
+}
+
+.left-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .right-actions {

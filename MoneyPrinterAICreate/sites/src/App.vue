@@ -460,7 +460,7 @@ body {
   padding: 20px;
   min-height: calc(100vh - var(--top-nav-height));
   flex: 1;
-  overflow-y: auto;
+  overflow-y: hidden; /* 修改为hidden以防止滚动条出现 */
   width: 100%;
   box-sizing: border-box;
 }
