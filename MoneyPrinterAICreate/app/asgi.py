@@ -44,7 +44,6 @@ def get_application() -> FastAPI:
         version=config.project_version,
         debug=False,
     )
-    instance.include_router(root_api_router)
     instance.add_exception_handler(HttpException, exception_handler)
     instance.add_exception_handler(RequestValidationError, validation_exception_handler)
     return instance
@@ -52,9 +51,14 @@ def get_application() -> FastAPI:
 
 app = get_application()
 
-# Configures the CORS middleware for the FastAPI app
-cors_allowed_origins_str = os.getenv("CORS_ALLOWED_ORIGINS", "")
-origins = cors_allowed_origins_str.split(",") if cors_allowed_origins_str else ["*"]
+# 先添加中间件
+origins = [
+    "http://localhost:3000",  # Vue开发服务器
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",  # 后端服务器
+    "http://127.0.0.1:8000",
+    "*"  # 生产环境可以删除通配符，使用具体的域名
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -63,6 +67,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 再注册API路由
+app.include_router(root_api_router)
+
+# 挂载静态文件目录
 task_dir = utils.task_dir()
 app.mount(
     "/tasks", StaticFiles(directory=task_dir, html=True, follow_symlink=True), name=""

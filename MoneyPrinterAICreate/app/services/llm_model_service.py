@@ -29,8 +29,13 @@ class LLMModelService:
                 detail=f"模型展示名称 '{model_data.display_name}' 已存在"
             )
         
+        # 为operator字段设置默认值"admin"
+        model_dict = model_data.model_dump()
+        if not model_dict.get('operator'):
+            model_dict['operator'] = 'admin'
+        
         # 创建模型实例
-        db_model = LLMModel(**model_data.model_dump())
+        db_model = LLMModel(**model_dict)
         db.add(db_model)
         db.commit()
         db.refresh(db_model)
@@ -65,6 +70,12 @@ class LLMModelService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"模型展示名称 '{update_data['display_name']}' 已存在"
                 )
+        
+        # 为operator字段设置默认值"admin"（如果没有提供）
+        if 'operator' not in update_data:
+            update_data['operator'] = 'admin'
+        elif not update_data['operator']:
+            update_data['operator'] = 'admin'
         
         # 更新模型字段
         for field, value in update_data.items():

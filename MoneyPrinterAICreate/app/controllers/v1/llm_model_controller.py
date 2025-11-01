@@ -14,13 +14,13 @@ from app.services.llm_model_service import LLMModelService
 
 # 创建路由器
 router = APIRouter(
-    prefix="/api/v1/models",
+    prefix="/models",
     tags=["大模型管理"],
     responses={404: {"description": "Not found"}},
 )
 
 
-@router.post("/", response_model=LLMModelResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/add", response_model=LLMModelResponse, status_code=status.HTTP_201_CREATED)
 async def create_model(
     model: LLMModelCreate,
     db: Session = Depends(get_db)

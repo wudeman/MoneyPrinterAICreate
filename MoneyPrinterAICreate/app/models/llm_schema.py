@@ -20,7 +20,7 @@ class LLMModelBase(BaseModel):
 
 class LLMModelCreate(LLMModelBase):
     """创建大模型请求"""
-    operator: str = Field(..., description="操作人")
+    operator: Optional[str] = Field(None, description="操作人")
 
 
 class LLMModelUpdate(BaseModel):
@@ -35,7 +35,7 @@ class LLMModelUpdate(BaseModel):
     support_first_frame: Optional[bool] = Field(None, description="是否支持首帧")
     support_last_frame: Optional[bool] = Field(None, description="是否支持尾帧")
     status: Optional[int] = Field(None, description="状态：1-启用，0-禁用")
-    operator: str = Field(..., description="操作人")
+    operator: Optional[str] = Field(None, description="操作人")
 
 
 class LLMModelResponse(LLMModelBase):
