@@ -8,6 +8,7 @@ class LLMModelBase(BaseModel):
     """大模型基础信息"""
     display_name: str = Field(..., description="模型展示名称")
     model_name: str = Field(..., description="模型名称")
+    model_provider: Optional[str] = Field(None, description="模型供应商")
     base_url: Optional[str] = Field(None, description="调用地址")
     api_key: Optional[str] = Field(None, description="密钥")
     model_type: ModelType = Field(..., description="模型类型")
@@ -27,6 +28,7 @@ class LLMModelUpdate(BaseModel):
     """更新大模型请求"""
     display_name: Optional[str] = Field(None, description="模型展示名称")
     model_name: Optional[str] = Field(None, description="模型名称")
+    model_provider: Optional[str] = Field(None, description="模型供应商")
     base_url: Optional[str] = Field(None, description="调用地址")
     api_key: Optional[str] = Field(None, description="密钥")
     model_type: Optional[ModelType] = Field(None, description="模型类型")

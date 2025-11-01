@@ -56,6 +56,7 @@
             <el-table-column type="index" label="序号" width="60" align="center"></el-table-column>
             <el-table-column prop="display_name" label="展示名称" align="center" min-width="120"></el-table-column>
             <el-table-column prop="model_name" label="模型名称" align="center" min-width="120"></el-table-column>
+            <el-table-column prop="model_provider" label="模型供应商" align="center" min-width="120"></el-table-column>
             <el-table-column prop="base_url" label="调用地址" align="center" min-width="200">
               <template #default="scope">
                 <el-tooltip :content="scope.row.base_url || '无'" placement="top">
@@ -231,6 +232,15 @@
           ></el-input>
         </el-form-item>
         
+        <el-form-item label="模型供应商" prop="model_provider">
+          <el-input
+            v-model="formData.model_provider"
+            placeholder="请输入模型供应商"
+            maxlength="50"
+            show-word-limit
+          ></el-input>
+        </el-form-item>
+        
         <el-form-item label="调用地址">
           <el-input 
             v-model="formData.base_url"
@@ -400,6 +410,7 @@ const formRules = {
 const formData = reactive<ModelFormData>({
   display_name: '',
   model_name: '',
+  model_provider: '',
   base_url: '',
   api_key: '',
   model_type: 'text',
@@ -513,6 +524,7 @@ const handleEditModel = (model: LLMModel) => {
   Object.assign(formData, {
     display_name: model.display_name,
     model_name: model.model_name,
+    model_provider: model.model_provider || '',
     base_url: model.base_url || '',
     api_key: '', // 不显示原密钥
     model_type: model.model_type,
@@ -612,6 +624,7 @@ const resetForm = () => {
   Object.assign(formData, {
     display_name: '',
     model_name: '',
+    model_provider: '',
     base_url: '',
     api_key: '',
     model_type: 'text',
@@ -640,6 +653,7 @@ const handleSaveModel = async () => {
       body = {
         display_name: formData.display_name,
         model_name: formData.model_name,
+        model_provider: formData.model_provider || undefined,
         base_url: formData.base_url || undefined,
         api_key: formData.api_key || undefined,
         model_type: formData.model_type,
@@ -656,6 +670,7 @@ const handleSaveModel = async () => {
       body = {
         display_name: formData.display_name,
         model_name: formData.model_name,
+        model_provider: formData.model_provider || undefined,
         base_url: formData.base_url || undefined,
         model_type: formData.model_type,
         support_reference_image: formData.support_reference_image,

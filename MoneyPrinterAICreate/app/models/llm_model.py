@@ -21,6 +21,7 @@ class LLMModel(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, comment="模型ID")
     display_name = Column(String(255), nullable=False, unique=True, comment="模型展示名称")
     model_name = Column(String(255), nullable=False, comment="模型名称")
+    model_provider = Column(String(255), nullable=False, comment="模型供应商")
     base_url = Column(Text, nullable=True, comment="调用地址")
     api_key = Column(Text, nullable=True, comment="密钥")
     model_type = Column(Enum(ModelType), nullable=False, comment="模型类型")
