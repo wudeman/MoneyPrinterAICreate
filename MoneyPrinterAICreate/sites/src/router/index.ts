@@ -17,6 +17,11 @@ const router = createRouter({
       path: '/template-management',
       name: 'template-management',
       component: () => import('../views/TemplateManagement.vue')
+    },
+    {
+      path: '/dict-management',
+      name: 'dictManagement',
+      component: () => import('../views/DictManagement.vue')
     }
   ]
 })
