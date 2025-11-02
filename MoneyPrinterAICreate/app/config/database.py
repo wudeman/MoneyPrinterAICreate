@@ -55,6 +55,7 @@ def init_db():
     try:
         # 导入所有模型，确保它们被注册
         from app.models.llm_model import LLMModel
+        from app.models.template_model import TemplateModel
         
         # 创建所有表
         Base.metadata.create_all(bind=engine)

@@ -20,9 +20,9 @@
             <label class="option-label">模板选择</label>
             <select v-model="templateType" class="select-option">
               <option value="">请选择模板</option>
-              <option value="short-film">短片剧本</option>
-              <option value="tv-series">电视剧本</option>
-              <option value="movie">电影剧本</option>
+              <option v-for="template in templates" :key="template.id" :value="template.id">
+                {{ template.template_name }}
+              </option>
             </select>
           </div>
           
@@ -47,7 +47,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import axios from 'axios';
 
 // 创作灵感文本
 const inspirationText = ref('');
@@ -55,6 +56,21 @@ const inspirationText = ref('');
 const templateType = ref('');
 // 风格类型
 const styleType = ref('');
+// 模板列表
+const templates = ref<any[]>([]);
+
+/**
+ * 获取激活的模板列表
+ */
+async function getActiveTemplates() {
+  try {
+    // 使用正确的API路径
+    const response = await axios.get('/api/v1/templates/active/list');
+    templates.value = response.data;
+  } catch (error) {
+    console.error('获取模板列表失败:', error);
+  }
+}
 
 /**
  * 处理生成按钮点击事件
@@ -74,6 +90,11 @@ const handleGenerate = () => {
   
   // 这里可以调用实际的API进行剧本生成
 };
+
+// 组件挂载时获取模板列表
+onMounted(() => {
+  getActiveTemplates();
+});
 </script>
 
 <style scoped>

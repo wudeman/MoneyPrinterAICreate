@@ -12,6 +12,11 @@ const router = createRouter({
       path: '/model-management',
       name: 'modelManagement',
       component: () => import('../views/ModelManagementView.vue')
+    },
+    {
+      path: '/template-management',
+      name: 'template-management',
+      component: () => import('../views/TemplateManagement.vue')
     }
   ]
 })
