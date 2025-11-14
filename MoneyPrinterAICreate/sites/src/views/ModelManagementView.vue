@@ -141,6 +141,13 @@
                 </el-tag>
               </template>
             </el-table-column>
+            <el-table-column label="是否默认" align="center" width="100">
+              <template #default="scope">
+                <el-tag :type="scope.row.is_default === 1 ? 'primary' : 'info'">
+                  {{ scope.row.is_default === 1 ? '是' : '否' }}
+                </el-tag>
+              </template>
+            </el-table-column>
             <el-table-column prop="operator" label="操作人" align="center" width="100"></el-table-column>
             <el-table-column label="更新时间" align="center" width="160">
               <template #default="scope">
@@ -309,6 +316,13 @@
             inactive-text="禁用"
           ></el-switch>
         </el-form-item>
+        <el-form-item label="是否默认">
+          <el-switch
+            v-model="formData.is_default"
+            active-text="是"
+            inactive-text="否"
+          ></el-switch>
+        </el-form-item>
       </el-form>
 
       <template #footer>
@@ -344,6 +358,7 @@ interface LLMModel {
   support_first_frame: boolean;
   support_last_frame: boolean;
   status: number;
+  is_default: number;
   operator?: string;
   updated_at?: string;
   created_at?: string;
@@ -361,6 +376,7 @@ interface ModelFormData {
   support_first_frame: boolean;
   support_last_frame: boolean;
   status: boolean;
+  is_default: boolean;
 }
 
 // 搜索参数
@@ -415,7 +431,8 @@ const formData = reactive<ModelFormData>({
   support_multiple_reference_images: false,
   support_first_frame: false,
   support_last_frame: false,
-  status: true
+  status: true,
+  is_default: false
 });
 
 // 计算属性
@@ -529,7 +546,8 @@ const handleEditModel = (model: LLMModel) => {
     support_multiple_reference_images: model.support_multiple_reference_images,
     support_first_frame: model.support_first_frame,
     support_last_frame: model.support_last_frame,
-    status: model.status === 1
+    status: model.status === 1,
+    is_default: model.is_default === 1
   });
   
   dialogVisible.value = true;
@@ -629,7 +647,8 @@ const resetForm = () => {
     support_multiple_reference_images: false,
     support_first_frame: false,
     support_last_frame: false,
-    status: true
+    status: true,
+    is_default: false
   });
 };
 
@@ -658,7 +677,8 @@ const handleSaveModel = async () => {
         support_multiple_reference_images: formData.support_multiple_reference_images,
         support_first_frame: formData.support_first_frame,
         support_last_frame: formData.support_last_frame,
-        status: formData.status ? 1 : 0
+        status: formData.status ? 1 : 0,
+        is_default: formData.is_default ? 1 : 0
       };
     } else if (isEditMode.value && selectedModel.value) {
       // 更新模型
@@ -674,7 +694,8 @@ const handleSaveModel = async () => {
         support_multiple_reference_images: formData.support_multiple_reference_images,
         support_first_frame: formData.support_first_frame,
         support_last_frame: formData.support_last_frame,
-        status: formData.status ? 1 : 0
+        status: formData.status ? 1 : 0,
+        is_default: formData.is_default ? 1 : 0
       };
       // 只有在输入了新密钥时才更新
       if (formData.api_key) {

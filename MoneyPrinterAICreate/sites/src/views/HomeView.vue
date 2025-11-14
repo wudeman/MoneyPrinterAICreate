@@ -29,12 +29,11 @@
           <div class="option-group">
             <label class="option-label">风格</label>
             <select v-model="styleType" class="select-option">
-              <option value="">请选择风格</option>
-              <option value="drama">戏剧性</option>
-              <option value="comedy">喜剧</option>
-              <option value="suspense">悬疑</option>
-              <option value="romance">浪漫</option>
-            </select>
+                <option value="">请选择风格</option>
+                <option v-for="style in styles" :key="style.dict_key" :value="style.dict_key">
+                  {{ style.dict_name }}
+                </option>
+              </select>
           </div>
           
           <button @click="handleGenerate" class="generate-btn">
@@ -58,6 +57,8 @@ const templateType = ref('');
 const styleType = ref('');
 // 模板列表
 const templates = ref<any[]>([]);
+// 风格列表
+const styles = ref<any[]>([]);
 
 /**
  * 获取激活的模板列表
@@ -71,6 +72,24 @@ async function getActiveTemplates() {
     console.error('获取模板列表失败:', error);
   }
 }
+
+/**
+   * 获取风格列表
+   */
+  async function getActiveStyles() {
+    try {
+      // 调用字典管理接口，根据字典类型"风格"查询
+      const response = await axios.get('/api/v1/dicts', {
+        params: {
+          dict_type: '风格',
+          status: 'active'
+        }
+      });
+      styles.value = response.data.items;
+    } catch (error) {
+      console.error('获取风格列表失败:', error);
+    }
+  }
 
 /**
  * 处理生成按钮点击事件
@@ -91,9 +110,10 @@ const handleGenerate = () => {
   // 这里可以调用实际的API进行剧本生成
 };
 
-// 组件挂载时获取模板列表
+// 组件挂载时获取模板列表和风格列表
 onMounted(() => {
   getActiveTemplates();
+  getActiveStyles();
 });
 </script>
 

@@ -17,6 +17,7 @@ class LLMModelBase(BaseModel):
     support_first_frame: bool = Field(False, description="是否支持首帧")
     support_last_frame: bool = Field(False, description="是否支持尾帧")
     status: int = Field(1, description="状态：1-启用，0-禁用")
+    is_default: int = Field(0, description="是否默认：1-是，0-否")
 
 
 class LLMModelCreate(LLMModelBase):
@@ -37,6 +38,7 @@ class LLMModelUpdate(BaseModel):
     support_first_frame: Optional[bool] = Field(None, description="是否支持首帧")
     support_last_frame: Optional[bool] = Field(None, description="是否支持尾帧")
     status: Optional[int] = Field(None, description="状态：1-启用，0-禁用")
+    is_default: Optional[int] = Field(None, description="是否默认：1-是，0-否")
     operator: Optional[str] = Field(None, description="操作人")
 
 

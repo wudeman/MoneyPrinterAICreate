@@ -30,6 +30,7 @@ class LLMModel(Base):
     support_first_frame = Column(Boolean, default=False, comment="是否支持首帧")
     support_last_frame = Column(Boolean, default=False, comment="是否支持尾帧")
     status = Column(Integer, default=1, comment="状态：1-启用，0-禁用")
+    is_default = Column(Integer, default=0, comment="是否默认：1-是，0-否")
     operator = Column(String(100), nullable=False, comment="操作人")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now(), comment="更新时间")

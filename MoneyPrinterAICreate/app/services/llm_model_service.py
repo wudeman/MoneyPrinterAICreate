@@ -36,6 +36,13 @@ class LLMModelService:
         
         # 创建模型实例
         db_model = LLMModel(**model_dict)
+        
+        # 如果设置为默认模型，先将其他同类型模型设为非默认
+        if db_model.is_default == 1:
+            db.query(LLMModel).filter(
+                LLMModel.model_type == db_model.model_type
+            ).update({"is_default": 0})
+        
         db.add(db_model)
         db.commit()
         db.refresh(db_model)
@@ -76,6 +83,14 @@ class LLMModelService:
             update_data['operator'] = 'admin'
         elif not update_data['operator']:
             update_data['operator'] = 'admin'
+        
+        # 如果要设置为默认模型，先将其他模型设为非默认
+        if 'is_default' in update_data and update_data['is_default'] == 1:
+            # 将其他同类型模型设为非默认
+            db.query(LLMModel).filter(
+                LLMModel.model_type == db_model.model_type,
+                LLMModel.id != model_id
+            ).update({"is_default": 0})
         
         # 更新模型字段
         for field, value in update_data.items():
