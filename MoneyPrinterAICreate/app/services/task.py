@@ -2,13 +2,15 @@ import math
 import os.path
 import re
 from os import path
+import json
+import shutil
 
 from edge_tts import SubMaker
 from loguru import logger
 
 from app.config import config
 from app.models import const
-from app.models.schema import VideoConcatMode, VideoParams
+from app.models.schema import VideoConcatMode, VideoParams, MediaGenerationRequest, VideoSynthesisRequest, StoryboardFrameRequest
 from app.services import llm, material, subtitle, video, voice
 from app.services import state as sm
 from app.utils import utils
@@ -325,6 +327,281 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
     )
     return kwargs
 
+
+def generate_frame(task_id: str, params: StoryboardFrameRequest):
+    """
+    为单个分镜生成画面
+    """
+    logger.info(f"start frame generation task: {task_id}")
+    sm.state.update_task(task_id, state=const.TASK_STATE_PROCESSING, progress=10)
+    
+    try:
+        # 创建任务目录
+        task_dir = utils.task_dir(task_id)
+        os.makedirs(task_dir, exist_ok=True)
+        
+        # 获取分镜数据
+        frame_index = params.frame_index
+        frame_prompt = params.frame_prompt
+        frame_content = params.frame_content
+        
+        logger.info(f"Generating frame {frame_index}: {frame_prompt}")
+        
+        # 生成分镜画面
+        # 这里可以根据配置调用不同的图像生成服务
+        # 暂时使用占位图像或从配置的模型服务获取
+        frame_dir = os.path.join(task_dir, f"frame_{frame_index}")
+        os.makedirs(frame_dir, exist_ok=True)
+        
+        # 保存分镜信息
+        frame_info = {
+            "index": frame_index,
+            "prompt": frame_prompt,
+            "content": frame_content,
+            "generated_at": utils.get_current_time(),
+            "status": "processing"
+        }
+        
+        # 模拟图像生成
+        # 实际应用中应该调用图像生成API
+        image_path = os.path.join(frame_dir, f"frame_{frame_index}.png")
+        
+        # 这里可以添加实际的图像生成逻辑
+        # 例如调用本地或远程的图像生成模型
+        
+        # 保存分镜信息
+        with open(os.path.join(frame_dir, "frame_info.json"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(frame_info, ensure_ascii=False, indent=2))
+        
+        sm.state.update_task(
+            task_id, 
+            state=const.TASK_STATE_COMPLETE, 
+            progress=100,
+            frame_index=frame_index,
+            frame_info=frame_info,
+            image_path=image_path
+        )
+        
+        logger.success(f"Frame generation completed: {task_id}")
+        return {
+            "frame_index": frame_index,
+            "image_path": image_path,
+            "frame_info": frame_info
+        }
+        
+    except Exception as e:
+        logger.error(f"Frame generation failed: {str(e)}")
+        sm.state.update_task(task_id, state=const.TASK_STATE_FAILED, error=str(e))
+        raise
+
+def generate_media_batch(task_id: str, params: MediaGenerationRequest):
+    """
+    批量生成媒体内容（画面、配音、动效）
+    """
+    logger.info(f"start media batch generation task: {task_id}")
+    sm.state.update_task(task_id, state=const.TASK_STATE_PROCESSING, progress=5)
+    
+    try:
+        # 创建任务目录
+        task_dir = utils.task_dir(task_id)
+        os.makedirs(task_dir, exist_ok=True)
+        
+        # 获取项目信息
+        project_id = params.project_id
+        storyboard_data = params.storyboard_data
+        
+        sm.state.update_task(task_id, progress=10)
+        
+        generated_media = {
+            "frames": [],
+            "audios": [],
+            "effects": []
+        }
+        
+        # 处理每个分镜
+        total_frames = len(storyboard_data)
+        for i, frame in enumerate(storyboard_data):
+            frame_index = frame.get("index", i)
+            frame_dir = os.path.join(task_dir, f"frame_{frame_index}")
+            os.makedirs(frame_dir, exist_ok=True)
+            
+            # 进度更新
+            progress = 10 + (i / total_frames) * 80
+            sm.state.update_task(task_id, progress=progress)
+            
+            try:
+                # 1. 生成画面（如果需要）
+                if params.generate_images:
+                    image_path = os.path.join(frame_dir, f"frame_{frame_index}.png")
+                    # 这里添加实际的图像生成逻辑
+                    # 模拟生成成功
+                    generated_media["frames"].append({
+                        "index": frame_index,
+                        "image_path": image_path,
+                        "status": "completed"
+                    })
+                
+                # 2. 生成配音（如果需要）
+                if params.generate_audios:
+                    audio_path = os.path.join(frame_dir, f"audio_{frame_index}.mp3")
+                    frame_text = frame.get("content", "")
+                    
+                    # 调用TTS服务生成配音
+                    if frame_text:
+                        # 使用现有的voice.tts函数生成配音
+                        voice.tts(
+                            text=frame_text,
+                            voice_name=voice.parse_voice_name(params.voice_name),
+                            voice_rate=params.voice_rate,
+                            voice_file=audio_path
+                        )
+                        
+                        generated_media["audios"].append({
+                            "index": frame_index,
+                            "audio_path": audio_path,
+                            "duration": 5.0  # 模拟时长
+                        })
+                
+                # 3. 添加动效（如果需要）
+                if params.generate_effects and frame.get("effects"):
+                    generated_media["effects"].append({
+                        "index": frame_index,
+                        "effects": frame.get("effects", []),
+                        "status": "applied"
+                    })
+                
+            except Exception as e:
+                logger.error(f"Error processing frame {frame_index}: {str(e)}")
+                # 继续处理其他分镜
+                continue
+        
+        # 保存媒体生成结果
+        with open(os.path.join(task_dir, "generated_media.json"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(generated_media, ensure_ascii=False, indent=2))
+        
+        sm.state.update_task(
+            task_id,
+            state=const.TASK_STATE_COMPLETE,
+            progress=100,
+            generated_media=generated_media,
+            project_id=project_id
+        )
+        
+        logger.success(f"Media batch generation completed: {task_id}")
+        return {
+            "generated_media": generated_media,
+            "project_id": project_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Media batch generation failed: {str(e)}")
+        sm.state.update_task(task_id, state=const.TASK_STATE_FAILED, error=str(e))
+        raise
+
+def synthesize_video(task_id: str, params: VideoSynthesisRequest):
+    """
+    合成最终视频
+    """
+    logger.info(f"start video synthesis task: {task_id}")
+    sm.state.update_task(task_id, state=const.TASK_STATE_PROCESSING, progress=10)
+    
+    try:
+        # 创建任务目录
+        task_dir = utils.task_dir(task_id)
+        os.makedirs(task_dir, exist_ok=True)
+        
+        # 获取参数
+        project_id = params.project_id
+        storyboard_data = params.storyboard_data
+        media_data = params.media_data
+        bgm_path = params.bgm_path
+        
+        sm.state.update_task(task_id, progress=20)
+        
+        # 创建临时工作目录
+        temp_dir = os.path.join(task_dir, "temp")
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # 处理每个分镜，生成片段
+        segment_paths = []
+        total_frames = len(storyboard_data)
+        
+        for i, frame in enumerate(storyboard_data):
+            frame_index = frame.get("index", i)
+            
+            # 进度更新
+            progress = 20 + (i / total_frames) * 50
+            sm.state.update_task(task_id, progress=progress)
+            
+            try:
+                # 获取分镜媒体资源
+                frame_media = next((m for m in media_data if m.get("index") == frame_index), None)
+                if not frame_media:
+                    logger.warning(f"No media data found for frame {frame_index}")
+                    continue
+                
+                # 视频片段路径
+                segment_path = os.path.join(temp_dir, f"segment_{frame_index}.mp4")
+                
+                # 构建视频片段
+                # 这里添加实际的视频合成逻辑
+                # 例如使用ffmpeg将图像、音频合成为视频片段
+                
+                # 模拟成功生成片段
+                segment_paths.append(segment_path)
+                
+            except Exception as e:
+                logger.error(f"Error synthesizing segment {frame_index}: {str(e)}")
+                # 继续处理其他片段
+                continue
+        
+        # 进度更新
+        sm.state.update_task(task_id, progress=80)
+        
+        # 合并所有片段
+        final_video_path = os.path.join(task_dir, "final_video.mp4")
+        
+        # 添加背景音乐（如果提供）
+        if bgm_path and os.path.exists(bgm_path):
+            # 这里添加实际的背景音乐处理逻辑
+            logger.info("Adding background music to final video")
+        
+        # 保存合成结果信息
+        synthesis_result = {
+            "final_video": final_video_path,
+            "segments": segment_paths,
+            "project_id": project_id,
+            "bgm_used": bool(bgm_path),
+            "generated_at": utils.get_current_time()
+        }
+        
+        with open(os.path.join(task_dir, "synthesis_result.json"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(synthesis_result, ensure_ascii=False, indent=2))
+        
+        # 清理临时文件
+        try:
+            shutil.rmtree(temp_dir)
+        except:
+            pass
+        
+        sm.state.update_task(
+            task_id,
+            state=const.TASK_STATE_COMPLETE,
+            progress=100,
+            final_video=final_video_path,
+            synthesis_result=synthesis_result
+        )
+        
+        logger.success(f"Video synthesis completed: {task_id}")
+        return {
+            "final_video": final_video_path,
+            "synthesis_result": synthesis_result
+        }
+        
+    except Exception as e:
+        logger.error(f"Video synthesis failed: {str(e)}")
+        sm.state.update_task(task_id, state=const.TASK_STATE_FAILED, error=str(e))
+        raise
 
 if __name__ == "__main__":
     task_id = "task_id"

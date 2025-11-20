@@ -42,11 +42,20 @@
           </button>
         </div>
       </div>
+      
+      <!-- 集成测试入口 -->
+      <div class="test-access">
+        <router-link to="/integration-test" class="test-link">
+          <span class="test-icon">🔍</span>
+          <span>运行集成测试</span>
+        </router-link>
+      </div>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import axios from 'axios';
 
 // 创作灵感文本
@@ -59,6 +68,9 @@ const styleType = ref('');
 const templates = ref<any[]>([]);
 // 风格列表
 const styles = ref<any[]>([]);
+
+// 路由实例
+const router = useRouter();
 
 /**
  * 获取激活的模板列表
@@ -93,21 +105,34 @@ async function getActiveTemplates() {
 
 /**
  * 处理生成按钮点击事件
- * 这里可以添加生成剧本的逻辑
+ * 调用后端API生成剧本并跳转到编辑页面
  */
-const handleGenerate = () => {
+const handleGenerate = async () => {
   if (!inspirationText.value.trim()) {
     alert('请输入创作灵感');
     return;
   }
   
-  // 模拟生成过程
-  console.log('开始生成剧本...');
-  console.log('创作灵感:', inspirationText.value);
-  console.log('模板类型:', templateType.value);
-  console.log('风格:', styleType.value);
-  
-  // 这里可以调用实际的API进行剧本生成
+  try {
+    // 获取选中的模板和风格信息
+    const selectedTemplate = templates.value.find(t => t.id === templateType.value);
+    const selectedStyle = styles.value.find(s => s.dict_key === styleType.value);
+    
+    // 跳转到剧本编辑页面，并传递参数
+    router.push({
+      path: '/script-edit',
+      query: {
+        inspiration: inspirationText.value,
+        templateId: templateType.value,
+        templateName: selectedTemplate?.template_name || '',
+        styleId: styleType.value,
+        styleName: selectedStyle?.dict_name || ''
+      }
+    });
+  } catch (error) {
+    console.error('处理生成请求失败:', error);
+    alert('生成剧本请求失败，请重试');
+  }
 };
 
 // 组件挂载时获取模板列表和风格列表
@@ -322,6 +347,42 @@ onMounted(() => {
   }
 }
 
+/* 集成测试入口样式 */
+.test-access {
+  margin-top: 30px;
+  text-align: center;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.test-access:hover {
+  opacity: 1;
+}
+
+.test-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #f0f4ff 0%, #d9e0ff 100%);
+  color: #3a4be0;
+  text-decoration: none;
+  border-radius: 8px;
+  border: 2px dashed #5d6afb;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.test-link:hover {
+  background: linear-gradient(135deg, #e6ebff 0%, #cbd4ff 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(93, 106, 251, 0.2);
+}
+
+.test-icon {
+  font-size: 18px;
+}
+
 @media (max-width: 480px) {
   .home-view {
     padding: 15px 10px;
@@ -340,4 +401,93 @@ onMounted(() => {
     font-size: 15px;
   }
 }
+/* 首页样式 */
+.home {
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: 100vh;
+}
+
+.home h1 {
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 40px;
+  font-size: 2.5rem;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.feature-item {
+  background: white;
+  padding: 30px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.feature-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.feature-item h2 {
+  color: var(--primary-color);
+  margin-bottom: 15px;
+  font-size: 1.5rem;
+}
+
+.feature-item p {
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.feature-item a {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.feature-item a:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(93, 106, 251, 0.3);
+}
+
+/* 测试项目特殊样式 */
+.test-item {
+  background: linear-gradient(135deg, #f0f4ff 0%, #d9e0ff 100%);
+  border: 2px dashed var(--primary-color);
+}
+
+.test-item h2 {
+  color: #3a4be0;
+}
+
+@media (max-width: 768px) {
+  .home h1 {
+    font-size: 2rem;
+  }
+  
+  .features {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .feature-item {
+    padding: 25px;
+  }
+}
+
 </style>

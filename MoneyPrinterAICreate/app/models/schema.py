@@ -328,3 +328,41 @@ class BgmUploadResponse(BaseResponse):
                 "data": {"file": "/MoneyPrinterTurbo/resource/songs/example.mp3"},
             },
         }
+
+
+class StoryboardFrameRequest(BaseModel):
+    """
+    分镜画面生成请求模型
+    """
+    frame_id: str
+    prompt: str
+    image_style: str = "realistic"
+    width: int = 1920
+    height: int = 1080
+    negative_prompt: str = ""
+
+
+class MediaGenerationRequest(BaseModel):
+    """
+    媒体生成请求模型
+    """
+    storyboard_id: str
+    frames: List[StoryboardFrameRequest]
+    audio_enabled: bool = True
+    effects_enabled: bool = True
+    voice_name: str = "zh-CN-XiaoxiaoNeural-Female"
+    voice_volume: float = 1.0
+    voice_rate: float = 1.0
+
+
+class VideoSynthesisRequest(BaseModel):
+    """
+    视频合成请求模型
+    """
+    storyboard_id: str
+    bgm_file: str = ""
+    bgm_volume: float = 0.2
+    transition_effect: str = "fade"
+    duration_per_frame: int = 3
+    output_format: str = "mp4"
+    output_quality: str = "high"

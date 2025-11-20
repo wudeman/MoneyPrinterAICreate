@@ -25,6 +25,9 @@ from app.models.schema import (
     TaskQueryResponse,
     TaskResponse,
     TaskVideoRequest,
+    MediaGenerationRequest,
+    VideoSynthesisRequest,
+    StoryboardFrameRequest,
 )
 from app.services import state as sm
 from app.services import task as tm
@@ -70,6 +73,72 @@ def create_audio(
     background_tasks: BackgroundTasks, request: Request, body: AudioRequest
 ):
     return create_task(request, body, stop_at="audio")
+
+@router.post("/media/generate-frame", response_model=TaskResponse, summary="Generate storyboard frame image")
+def generate_frame(
+    background_tasks: BackgroundTasks, request: Request, body: StoryboardFrameRequest
+):
+    """为单个分镜生成画面"""
+    task_id = utils.get_uuid()
+    request_id = base.get_task_id(request)
+    try:
+        task = {
+            "task_id": task_id,
+            "request_id": request_id,
+            "params": body.model_dump(),
+        }
+        sm.state.update_task(task_id)
+        task_manager.add_task(tm.generate_frame, task_id=task_id, params=body)
+        logger.success(f"Frame generation task created: {utils.to_json(task)}")
+        return utils.get_response(200, task)
+    except ValueError as e:
+        raise HttpException(
+            task_id=task_id, status_code=400, message=f"{request_id}: {str(e)}"
+        )
+
+@router.post("/media/generate-batch", response_model=TaskResponse, summary="Batch generate media content")
+def generate_media_batch(
+    background_tasks: BackgroundTasks, request: Request, body: MediaGenerationRequest
+):
+    """批量生成媒体内容（画面、配音、动效）"""
+    task_id = utils.get_uuid()
+    request_id = base.get_task_id(request)
+    try:
+        task = {
+            "task_id": task_id,
+            "request_id": request_id,
+            "params": body.model_dump(),
+        }
+        sm.state.update_task(task_id)
+        task_manager.add_task(tm.generate_media_batch, task_id=task_id, params=body)
+        logger.success(f"Media batch generation task created: {utils.to_json(task)}")
+        return utils.get_response(200, task)
+    except ValueError as e:
+        raise HttpException(
+            task_id=task_id, status_code=400, message=f"{request_id}: {str(e)}"
+        )
+
+@router.post("/video/synthesis", response_model=TaskResponse, summary="Synthesize final video")
+def synthesize_video(
+    background_tasks: BackgroundTasks, request: Request, body: VideoSynthesisRequest
+):
+    """合成最终视频"""
+    task_id = utils.get_uuid()
+    request_id = base.get_task_id(request)
+    try:
+        task = {
+            "task_id": task_id,
+            "request_id": request_id,
+            "params": body.model_dump(),
+        }
+        sm.state.update_task(task_id)
+        task_manager.add_task(tm.synthesize_video, task_id=task_id, params=body)
+        logger.success(f"Video synthesis task created: {utils.to_json(task)}")
+        return utils.get_response(200, task)
+    except ValueError as e:
+        raise HttpException(
+            task_id=task_id, status_code=400, message=f"{request_id}: {str(e)}"
+        )
 
 
 def create_task(
