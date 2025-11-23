@@ -196,7 +196,7 @@
     <!-- 底部操作按钮 -->
     <div class="action-buttons">
       <button @click="saveAllStoryboards" class="secondary-btn">保存所有分镜</button>
-      <button @click="nextStep" class="primary-btn">下一步 →</button>
+      <button @click="nextStepToMediaGeneration" class="primary-btn">下一步 →</button>
     </div>
   </div>
 </template>
@@ -607,7 +607,7 @@ const goBack = () => {
 /**
  * 下一步：生成画面和配音
  */
-const nextStep = async () => {
+const nextStepToMediaGeneration = async () => {
   if (storyboards.value.length === 0) {
     alert('请至少创建一个分镜');
     return;

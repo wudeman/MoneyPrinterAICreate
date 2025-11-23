@@ -30,10 +30,22 @@
             <label class="option-label">风格</label>
             <select v-model="styleType" class="select-option">
                 <option value="">请选择风格</option>
-                <option v-for="style in styles" :key="style.dict_key" :value="style.dict_key">
+                <option v-for="style in styles" :key="style.id" :value="style.id">
                   {{ style.dict_name }}
                 </option>
               </select>
+          </div>
+          
+          <div class="option-group">
+            <label class="option-label">时长（秒）</label>
+            <input 
+              v-model.number="duration" 
+              type="number" 
+              class="select-option" 
+              min="10" 
+              max="300" 
+              placeholder="请输入视频时长"
+            >
           </div>
           
           <button @click="handleGenerate" class="generate-btn">
@@ -64,6 +76,8 @@ const inspirationText = ref('');
 const templateType = ref('');
 // 风格类型
 const styleType = ref('');
+// 视频时长（秒）
+const duration = ref(60);
 // 模板列表
 const templates = ref<any[]>([]);
 // 风格列表
@@ -105,7 +119,7 @@ async function getActiveTemplates() {
 
 /**
  * 处理生成按钮点击事件
- * 调用后端API生成剧本并跳转到编辑页面
+ * 调用后端API创建任务并生成剧本
  */
 const handleGenerate = async () => {
   if (!inspirationText.value.trim()) {
@@ -113,20 +127,46 @@ const handleGenerate = async () => {
     return;
   }
   
+  if (!templateType.value) {
+    alert('请选择模板');
+    return;
+  }
+  
+  if (!styleType.value) {
+    alert('请选择风格');
+    return;
+  }
+  
+  if (!duration.value || duration.value < 10 || duration.value > 300) {
+    alert('请输入有效的视频时长（10-300秒）');
+    return;
+  }
+  
   try {
     // 获取选中的模板和风格信息
     const selectedTemplate = templates.value.find(t => t.id === templateType.value);
-    const selectedStyle = styles.value.find(s => s.dict_key === styleType.value);
+    const selectedStyle = styles.value.find(s => s.id === styleType.value);
     
-    // 跳转到剧本编辑页面，并传递参数
+    // 调用后端API创建任务并生成剧本
+    const response = await axios.post('/api/v1/tasks/create-and-generate', {
+      video_idea: inspirationText.value,
+      template_id: parseInt(templateType.value),
+      style_id: parseInt(styleType.value),
+      aspect_ratio: '16:9', // 默认宽高比
+      duration: duration.value
+    });
+    
+    // 跳转到剧本编辑页面，并传递任务ID
     router.push({
       path: '/script-edit',
       query: {
+        taskId: response.data.task_id,
         inspiration: inspirationText.value,
         templateId: templateType.value,
         templateName: selectedTemplate?.template_name || '',
         styleId: styleType.value,
-        styleName: selectedStyle?.dict_name || ''
+        styleName: selectedStyle?.dict_name || '',
+        duration: duration.value
       }
     });
   } catch (error) {

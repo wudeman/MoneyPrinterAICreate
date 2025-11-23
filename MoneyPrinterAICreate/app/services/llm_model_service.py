@@ -144,3 +144,20 @@ class LLMModelService:
             LLMModel.model_type == model_type,
             LLMModel.status == 1
         ).all()
+    
+    @staticmethod
+    def get_default_text_model(db: Session) -> Optional[LLMModel]:
+        """
+        获取默认的文本类型大模型配置
+        
+        Args:
+            db: 数据库会话
+            
+        Returns:
+            默认的文本类型大模型，如果不存在则返回None
+        """
+        return db.query(LLMModel).filter(
+            LLMModel.model_type == ModelType.TEXT,
+            LLMModel.is_default == 1,
+            LLMModel.status == 1
+        ).first()

@@ -233,7 +233,7 @@
               <p>生成预览中...</p>
             </div>
             <div v-else-if="previewVideoUrl" class="preview-video">
-              <video :src="previewVideoUrl" controls autoplay loop class="video-player"></audio>
+              <video :src="previewVideoUrl" controls autoplay loop class="video-player"></video>
               <div class="preview-actions">
                 <button @click="regeneratePreview" :disabled="isPreviewing" class="action-button">
                   重新预览
@@ -745,10 +745,6 @@ const generateFinalVideo = async () => {
           throw err;
         }
       }, 3000); // 每3秒轮询一次
-    
-    if (response.data.code !== 200) {
-      throw new Error(response.data.message || '生成视频失败');
-    }
     
     // 注意：成功的处理已在轮询中完成
     

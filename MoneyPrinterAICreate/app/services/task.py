@@ -11,19 +11,30 @@ from loguru import logger
 from app.config import config
 from app.models import const
 from app.models.schema import VideoConcatMode, VideoParams, MediaGenerationRequest, VideoSynthesisRequest, StoryboardFrameRequest
+from app.models.task_model import Task, TaskStatus
 from app.services import llm, material, subtitle, video, voice
 from app.services import state as sm
 from app.utils import utils
 
 
-def generate_script(task_id, params):
+def generate_script(task_id, params, db=None, db_task_id=None, llm_model=None):
     logger.info("\n\n## generating video script")
-    video_script = params.video_script.strip()
+    # 检查params是否有video_script属性
+    video_script = getattr(params, "video_script", "").strip()
     if not video_script:
+        # 获取模板信息
+        template_id = params.get("template_id", "") if isinstance(params, dict) else getattr(params, "template_id", "")
+        style_id = params.get("style_id", "") if isinstance(params, dict) else getattr(params, "style_id", "")
+        duration = params.get("duration", 30) if isinstance(params, dict) else getattr(params, "duration", 30)
+        
         video_script = llm.generate_script(
             video_subject=params.video_subject,
             language=params.video_language,
             paragraph_number=params.paragraph_number,
+            template_id=template_id,
+            style_id=style_id,
+            duration=duration,
+            llm_model=llm_model
         )
     else:
         logger.debug(f"video script: \n{video_script}")
@@ -31,6 +42,14 @@ def generate_script(task_id, params):
     if not video_script:
         sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
         logger.error("failed to generate video script.")
+        # 更新数据库任务状态为失败
+        if db and db_task_id:
+            try:
+                from app.services.task_service import TaskService
+                TaskService.update_task_status(db, db_task_id, TaskStatus.SCRIPT_GENERATE_FAILED)
+                logger.warning(f"数据库任务状态已更新为失败: {db_task_id}")
+            except Exception as e:
+                logger.error(f"更新数据库任务状态失败: {str(e)}")
         return None
 
     return video_script
@@ -208,15 +227,15 @@ def generate_final_videos(
     return final_video_paths, combined_video_paths
 
 
-def start(task_id, params: VideoParams, stop_at: str = "video"):
-    logger.info(f"start task: {task_id}, stop_at: {stop_at}")
+def start(task_id, params: VideoParams, stop_at: str = "video", db=None, db_task_id=None, llm_model=None):
+    logger.info(f"start task: {task_id}, stop_at: {stop_at}, db_task_id: {db_task_id}")
     sm.state.update_task(task_id, state=const.TASK_STATE_PROCESSING, progress=5)
 
     if type(params.video_concat_mode) is str:
         params.video_concat_mode = VideoConcatMode(params.video_concat_mode)
 
     # 1. Generate script
-    video_script = generate_script(task_id, params)
+    video_script = generate_script(task_id, params, db, db_task_id, llm_model=llm_model)
     if not video_script:
         sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
         return
@@ -227,6 +246,19 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
         sm.state.update_task(
             task_id, state=const.TASK_STATE_COMPLETE, progress=100, script=video_script
         )
+        
+        # 更新数据库任务状态为剧本生成完成
+        if db and db_task_id:
+            try:
+                from app.services.task_service import TaskService
+                # 保存剧本内容
+                TaskService.save_script_to_task(db, db_task_id, video_script)
+                # 更新任务状态
+                TaskService.update_task_status(db, db_task_id, TaskStatus.SCRIPT_COMPLETED)
+                logger.success(f"数据库任务状态更新成功: {db_task_id}")
+            except Exception as e:
+                logger.error(f"更新数据库任务状态失败: {str(e)}")
+        
         return {"script": video_script}
     #
     # # 2. Generate terms

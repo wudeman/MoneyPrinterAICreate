@@ -70,11 +70,27 @@ const flowNavigation = ref<InstanceType<typeof FlowNavigation>>();
 // 任务ID
 const taskId = ref('');
 
-// 初始化时从URL获取任务ID
-onMounted(() => {
+// 初始化时从URL获取任务ID，并尝试获取剧本内容
+onMounted(async () => {
   const queryTaskId = route.query.taskId as string;
   if (queryTaskId) {
     taskId.value = queryTaskId;
+    
+    // 直接获取任务详情而不是轮询
+    try {
+      loading.value = true;
+      const response = await axios.get(`/api/v1/tasks/${taskId.value}`);
+      const task = response.data.data;
+      
+      // 如果已经有剧本内容，直接显示
+      if (task && task.script) {
+        scriptContent.value = task.script;
+      }
+    } catch (error) {
+      console.error('获取任务详情失败:', error);
+    } finally {
+      loading.value = false;
+    }
   }
 });
 
@@ -143,13 +159,23 @@ const generateScript = async () => {
     });
     
     // 获取任务ID
-    const taskId = response.data.data.task_id;
-    localStorage.setItem('currentTaskId', taskId);
+    const newTaskId = response.data.data.task_id;
+    localStorage.setItem('currentTaskId', newTaskId);
     
-    generatingText.value = '正在生成剧本，请稍候...';
+    // 更新当前任务ID
+    taskId.value = newTaskId;
     
-    // 轮询任务状态，直到剧本生成完成
-    await pollTaskStatus(taskId);
+    generatingText.value = '正在获取剧本内容...';
+    
+    // 直接获取任务详情而不是轮询
+    const taskResponse = await axios.get(`/api/v1/tasks/${newTaskId}`);
+    const task = taskResponse.data.data;
+    
+    if (task && task.script) {
+      scriptContent.value = task.script;
+    } else {
+      error.value = '剧本生成可能尚未完成，请稍后刷新页面或重试';
+    }
   } catch (err: any) {
     console.error('生成剧本失败:', err);
     error.value = `生成剧本失败: ${err.message || '未知错误'}`;
@@ -159,55 +185,8 @@ const generateScript = async () => {
   }
 };
 
-/**
- * 轮询任务状态
- */
-const pollTaskStatus = async (taskId: string) => {
-  return new Promise((resolve, reject) => {
-    const maxRetries = 60; // 最多重试60次（约2分钟）
-    let retries = 0;
-    
-    const checkStatus = async () => {
-      retries++;
-      
-      if (retries > maxRetries) {
-        reject(new Error('生成剧本超时，请重试'));
-        return;
-      }
-      
-      try {
-        const response = await axios.get(`/api/v1/tasks/${taskId}`);
-        const task = response.data.data;
-        
-        // 检查任务状态
-        if (task && task.script) {
-            scriptContent.value = task.script;
-            
-            // 更新任务ID
-            taskId.value = taskId;
-            
-            resolve(null);
-          } else if (task && task.status === 'failed') {
-          reject(new Error('剧本生成失败'));
-        } else {
-          // 更新进度提示
-          if (retries % 5 === 0) {
-            generatingText.value = `正在生成剧本，已等待 ${retries * 2} 秒...`;
-          }
-          // 继续轮询，每2秒检查一次
-          setTimeout(checkStatus, 2000);
-        }
-      } catch (error) {
-        console.error('检查任务状态失败:', error);
-        // 如果是网络错误，继续尝试
-        setTimeout(checkStatus, 2000);
-      }
-    };
-    
-    // 开始轮询
-    setTimeout(checkStatus, 1000);
-  });
-};
+
+
 
 /**
  * 保存剧本

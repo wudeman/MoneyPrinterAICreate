@@ -10,11 +10,16 @@ from typing import List, Optional
 from app.controllers.v1.base import new_router
 from app.controllers import base as base_controller
 from app.models.schema import VideoParams, TaskResponse
+from app.models.task_model import Task, TaskStatus
+from app.models.task_schema import TaskCreate
+from app.services.task_service import TaskService
 from app.services import task as task_service
 from app.services import state as state_service
 from app.services import llm
 from app.services import bgm_service
 from app.utils import utils
+from app.config.database import get_db
+from sqlalchemy.orm import Session
 
 router = new_router()
 
@@ -40,6 +45,7 @@ class ScriptGenerateRequest(BaseModel):
     style_id: str = Field("", description="风格ID")
     video_language: str = Field("zh", description="视频语言")
     paragraph_number: int = Field(5, ge=1, le=20, description="段落数量")
+    duration: int = Field(30, ge=10, le=300, description="视频时长(秒)")
 
 
 class ScriptUpdateRequest(BaseModel):
@@ -94,10 +100,162 @@ class TaskController:
     
     @staticmethod
     @router.post("/tasks/script", response_model=TaskResponse)
-    def generate_script(
+    async def generate_script(
         background_tasks: BackgroundTasks,
         request: Request,
-        body: ScriptGenerateRequest
+        body: ScriptGenerateRequest,
+        db: Session = Depends(get_db)
+    ):
+        """生成视频剧本（原始接口）"""
+        return await TaskController._generate_script_implementation(
+            background_tasks, request, body, db
+        )
+    
+    @staticmethod
+    @router.post("/tasks/create-and-generate", response_model=ScriptGenerateResponse)
+    async def create_and_generate_script(
+        request: Request,
+        body: dict,
+        db: Session = Depends(get_db)
+    ):
+        """
+        创建任务并同步生成剧本
+        
+        Args:
+            request: FastAPI请求对象
+            body: 请求体（兼容前端格式）
+            db: 数据库会话
+            
+        Returns:
+            ScriptGenerateResponse: 包含任务ID和生成的剧本内容
+        """
+        from app.services.template_service import TemplateService
+        from app.services.llm_service import llm_service
+        from app.services.task_service import TaskService
+        from app.models.task_model import TaskStatus
+        from fastapi import status
+        from app.services.llm_model_service import LLMModelService
+        
+        task_id = utils.get_uuid()
+        request_id = base_controller.get_task_id(request)
+        
+        try:
+            # 转换前端请求格式
+            video_idea = body.get("video_idea", "")
+            template_id = body.get("template_id", None)
+            style_id = body.get("style_id", None)
+            duration = body.get("duration", 30)
+            
+            # 初始化服务
+            template_service = TemplateService()
+            llm_model_service = LLMModelService()
+            
+            # 1. 获取模板配置（必需）
+            template = None
+            if template_id:
+                template = template_service.get_template_by_id(db, template_id)
+                if not template:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"模板ID {template_id} 不存在或已停用"
+                    )
+                logger.info(f"模板加载成功: {template_id}")
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="模板ID不能为空"
+                )
+            
+            # 2. 创建任务
+            task_create = TaskCreate(
+                video_idea=video_idea,
+                template_id=template_id,
+                style_id=style_id,
+                aspect_ratio="16:9",  # 默认16:9
+                duration=duration,
+                operator="system"
+            )
+            
+            # 保存任务到数据库
+            db_task = TaskService.create_task(db, task_create)
+            
+            # 3. 获取默认的文档类型大模型配置
+            default_text_model = llm_model_service.get_default_text_model(db)
+            if not default_text_model:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="未找到默认的文本类型大模型，请联系管理员配置"
+                )
+            logger.info(f"使用默认文本模型: {default_text_model.model_name}")
+            
+            # 4. 构建生成剧本的提示词
+            prompt = template.script_prompt
+            prompt += f"\n视频创意：'{video_idea}'"
+            if duration:
+                prompt += f"\n视频时长约为 {duration} 秒。"
+            if style_id:
+                prompt += f"\n使用风格ID: {style_id}。"
+            
+            # 5. 调用模型生成剧本
+            logger.info(f"开始同步生成剧本，任务ID: {task_id}")
+            try:
+                # 使用llm_service的generate_text方法同步生成剧本
+                video_script = llm_service.generate_text(
+                    prompt=prompt,
+                    provider=default_text_model.model_provider,
+                    model_name=default_text_model.model_name,
+                    base_url=default_text_model.base_url,
+                    api_key=default_text_model.api_key,
+                    stream=False  # 非流式生成
+                )
+                logger.success(f"剧本同步生成成功，任务ID: {task_id}")
+            except Exception as e:
+                logger.error(f"剧本生成失败: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"剧本生成失败: {str(e)}"
+                )
+            
+            # 6. 更新任务剧本字段
+            TaskService.save_script_to_task(db, db_task.id, video_script)
+            TaskService.update_task_status(db, db_task.id, TaskStatus.SCRIPT_COMPLETED)
+            logger.info(f"任务剧本字段更新成功，数据库任务ID: {db_task.id}")
+            
+            # 7. 更新状态服务中的任务信息
+            state_service.state.update_task(
+                task_id, 
+                db_task_id=db_task.id,
+                script=video_script,
+                state="completed",
+                progress=100
+            )
+            
+            # 8. 返回任务ID和生成的剧本内容
+            return ScriptGenerateResponse(
+                task_id=task_id,
+                script=video_script
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            # 记录详细错误信息
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"创建并生成剧本时发生错误: {str(e)}")
+            logger.error(f"错误堆栈: {error_trace}")
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"创建并生成剧本失败: {str(e)}"
+            )
+    
+    @staticmethod
+    async def _generate_script_implementation(
+        background_tasks: BackgroundTasks,
+        request: Request,
+        body: ScriptGenerateRequest,
+        db: Session = Depends(get_db)
     ):
         """
         生成视频剧本
@@ -106,14 +264,39 @@ class TaskController:
             background_tasks: 后台任务
             request: FastAPI请求对象
             body: 剧本生成请求参数
+            db: 数据库会话
             
         Returns:
             TaskResponse: 包含任务ID的响应
         """
+        from app.services.template_service import TemplateService
+        from app.services.llm_model_service import LLMModelService
+        from fastapi import status
+        
         task_id = utils.get_uuid()
         request_id = base_controller.get_task_id(request)
         
         try:
+            # 初始化服务
+            template_service = TemplateService()
+            llm_model_service = LLMModelService()
+            
+            # 1. 获取模板配置
+            template = template_service.get_template_by_id(db, body.template_id)
+            if body.template_id and not template:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"模板ID {body.template_id} 不存在或已停用"
+                )
+            
+            # 2. 获取默认文本类型大模型配置
+            default_text_model = llm_model_service.get_default_text_model(db)
+            if not default_text_model:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="未找到默认的文本类型大模型，请联系管理员配置"
+                )
+            
             # 构建视频参数
             params = VideoParams(
                 video_subject=body.video_subject,
@@ -122,13 +305,30 @@ class TaskController:
                 paragraph_number=body.paragraph_number
             )
             
+            # 3. 使用TaskService创建数据库任务记录
+            task_create = TaskCreate(
+                video_idea=body.video_subject,
+                template_id=body.template_id,
+                style_id=body.style_id,
+                aspect_ratio="16:9",  # 默认16:9
+                duration=body.duration,
+                operator="system"  # 可以从request中获取实际的操作用户
+            )
+            
+            # 通过服务层创建任务，内部会处理状态设置和字段映射
+            db_task = TaskService.create_task(db, task_create)
+            
             task = {
                 "task_id": task_id,
                 "request_id": request_id,
-                "params": params.model_dump(),
-                "template_id": body.template_id,
-                "style_id": body.style_id
+                "params": {}
             }
+            # 只添加必要的字段，避免序列化问题
+            task["params"]["video_subject"] = body.video_subject
+            task["template_id"] = body.template_id
+            task["style_id"] = body.style_id
+            task["duration"] = body.duration
+            task["db_task_id"] = db_task.id  # 关联数据库任务ID
             
             # 更新任务状态
             state_service.state.update_task(task_id)
@@ -138,18 +338,28 @@ class TaskController:
                 task_service.start,
                 task_id=task_id,
                 params=params,
-                stop_at="script"
+                stop_at="script",
+                db=db,
+                db_task_id=db_task.id,
+                llm_model=default_text_model
             )
             
-            logger.success(f"剧本生成任务创建成功，任务ID: {task_id}")
+            logger.success(f"剧本生成任务创建成功，任务ID: {task_id}，数据库任务ID: {db_task.id}")
             return utils.get_response(200, task)
+        except HTTPException:
+            raise
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
                 detail=f"{request_id}: {str(e)}"
             )
         except Exception as e:
+            # 记录详细错误信息，包括完整堆栈
+            import traceback
+            error_trace = traceback.format_exc()
             logger.error(f"创建剧本生成任务时发生错误: {str(e)}")
+            logger.error(f"错误堆栈: {error_trace}")
+            db.rollback()
             raise HTTPException(
                 status_code=500,
                 detail=f"创建任务失败: {str(e)}"

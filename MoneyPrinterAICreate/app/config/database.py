@@ -57,6 +57,7 @@ def init_db():
         from app.models.llm_model import LLMModel
         from app.models.template_model import TemplateModel
         from app.models.dict_model import DictModel
+        from app.models.task_model import Task
         
         # 创建所有表
         Base.metadata.create_all(bind=engine)
