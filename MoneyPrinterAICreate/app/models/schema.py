@@ -4,6 +4,7 @@ from typing import Any, List, Optional
 
 import pydantic
 from pydantic import BaseModel
+from sqlalchemy import Null
 
 # 忽略 Pydantic 的特定警告
 warnings.filterwarnings(
@@ -222,8 +223,14 @@ class VideoTermsRequest(VideoTermsParams, BaseModel):
 ######################################################################################################
 class TaskResponse(BaseResponse):
     class TaskResponseData(BaseModel):
-        task_id: str
-
+        task_id: Optional[int] = None
+        video_idea: Optional[str] = None
+        template_id: Optional[int] = None
+        style_id: Optional[int] = None
+        duration: Optional[int] = None
+        script: Optional[str] = None
+        status: Optional[int] = None
+        
     data: TaskResponseData
 
     class Config:
@@ -231,7 +238,15 @@ class TaskResponse(BaseResponse):
             "example": {
                 "status": 200,
                 "message": "success",
-                "data": {"task_id": "6c85c8cc-a77a-42b9-bc30-947815aa0558"},
+                "data": {
+                    "task_id": 1,
+                    "video_idea": "美丽的春天花海",
+                    "template_id": "template_1",
+                    "style_id": "style_1",
+                    "duration": 30,
+                    "script": "春天的花海...",
+                    "status": "script_completed"
+                },
             },
         }
 

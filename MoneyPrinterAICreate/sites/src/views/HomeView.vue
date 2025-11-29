@@ -121,59 +121,93 @@ async function getActiveTemplates() {
  * 处理生成按钮点击事件
  * 调用后端API创建任务并生成剧本
  */
-const handleGenerate = async () => {
-  if (!inspirationText.value.trim()) {
-    alert('请输入创作灵感');
-    return;
-  }
+// 生成状态
+  const generating = ref(false);
   
-  if (!templateType.value) {
-    alert('请选择模板');
-    return;
-  }
-  
-  if (!styleType.value) {
-    alert('请选择风格');
-    return;
-  }
-  
-  if (!duration.value || duration.value < 10 || duration.value > 300) {
-    alert('请输入有效的视频时长（10-300秒）');
-    return;
-  }
-  
-  try {
-    // 获取选中的模板和风格信息
-    const selectedTemplate = templates.value.find(t => t.id === templateType.value);
-    const selectedStyle = styles.value.find(s => s.id === styleType.value);
+  const handleGenerate = async () => {
+    if (!inspirationText.value.trim()) {
+      alert('请输入创作灵感');
+      return;
+    }
     
-    // 调用后端API创建任务并生成剧本
-    const response = await axios.post('/api/v1/tasks/create-and-generate', {
-      video_idea: inspirationText.value,
-      template_id: parseInt(templateType.value),
-      style_id: parseInt(styleType.value),
-      aspect_ratio: '16:9', // 默认宽高比
-      duration: duration.value
-    });
+    if (!templateType.value) {
+      alert('请选择模板');
+      return;
+    }
     
-    // 跳转到剧本编辑页面，并传递任务ID
-    router.push({
-      path: '/script-edit',
-      query: {
-        taskId: response.data.task_id,
-        inspiration: inspirationText.value,
-        templateId: templateType.value,
-        templateName: selectedTemplate?.template_name || '',
-        styleId: styleType.value,
-        styleName: selectedStyle?.dict_name || '',
+    if (!styleType.value) {
+      alert('请选择风格');
+      return;
+    }
+    
+    if (!duration.value || duration.value < 10 || duration.value > 300) {
+      alert('请输入有效的视频时长（10-300秒）');
+      return;
+    }
+    
+    // 显示加载状态
+    generating.value = true;
+    
+    try {
+      // 获取选中的模板和风格信息
+      const selectedTemplate = templates.value.find(t => t.id === templateType.value);
+      const selectedStyle = styles.value.find(s => s.id === styleType.value);
+      
+      // 调用后端API创建任务并生成剧本
+      const response = await axios.post('/api/v1/tasks/create-and-generate', {
+        video_idea: inspirationText.value,
+        template_id: parseInt(templateType.value),
+        style_id: parseInt(styleType.value),
+        aspect_ratio: '16:9', // 默认宽高比
         duration: duration.value
+      });
+      
+      // 增强响应验证
+      let taskId = null;
+      if (response && response.data) {
+        taskId = response.data.task_id || response.data.data?.task_id;
       }
-    });
-  } catch (error) {
-    console.error('处理生成请求失败:', error);
-    alert('生成剧本请求失败，请重试');
-  }
-};
+      
+      if (!taskId) {
+        throw new Error('未返回有效的任务ID');
+      }
+      
+      // 保存任务ID到本地存储，确保在整个流程中可用
+      localStorage.setItem('currentTaskId', taskId);
+      localStorage.setItem('scriptCompleted', 'false'); // 初始设置为未完成
+      
+      console.log('剧本生成成功，任务ID:', taskId);
+      
+      // 跳转到剧本编辑页面，并传递任务ID和所有必要参数
+      router.push({
+        path: '/script-edit',
+        query: {
+          taskId: taskId,
+          inspiration: inspirationText.value,
+          templateId: templateType.value,
+          templateName: selectedTemplate?.template_name || '',
+          styleId: styleType.value,
+          styleName: selectedStyle?.dict_name || '',
+          duration: duration.value
+        }
+      });
+    } catch (error: any) {
+      console.error('处理生成请求失败:', error);
+      
+      // 更友好的错误提示
+      let errorMsg = '生成剧本请求失败，请重试';
+      if (error.response) {
+        errorMsg += `: ${error.response.status} - ${error.response.statusText}`;
+      } else if (error.message) {
+        errorMsg += `: ${error.message}`;
+      }
+      
+      alert(errorMsg);
+    } finally {
+      // 隐藏加载状态
+      generating.value = false;
+    }
+  };
 
 // 组件挂载时获取模板列表和风格列表
 onMounted(() => {

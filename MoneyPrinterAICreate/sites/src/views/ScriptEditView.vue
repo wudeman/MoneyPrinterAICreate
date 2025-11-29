@@ -74,7 +74,9 @@ const taskId = ref('');
 onMounted(async () => {
   const queryTaskId = route.query.taskId as string;
   if (queryTaskId) {
+    // 设置任务ID并存储到localStorage
     taskId.value = queryTaskId;
+    localStorage.setItem('currentTaskId', queryTaskId);
     
     // 直接获取任务详情而不是轮询
     try {
@@ -85,11 +87,21 @@ onMounted(async () => {
       // 如果已经有剧本内容，直接显示
       if (task && task.script) {
         scriptContent.value = task.script;
+      } else {
+        error.value = '未找到剧本内容，可以点击"生成剧本"按钮重新生成';
       }
     } catch (error) {
       console.error('获取任务详情失败:', error);
+      error.value = '获取任务详情失败，请尝试重新生成剧本';
     } finally {
       loading.value = false;
+    }
+  } else {
+    // 尝试从localStorage获取之前的任务ID
+    const savedTaskId = localStorage.getItem('currentTaskId');
+    if (savedTaskId) {
+      taskId.value = savedTaskId;
+      // 可以选择是否自动加载该任务的剧本
     }
   }
 });
@@ -143,32 +155,49 @@ const generateScript = async () => {
   
   loading.value = true;
   error.value = '';
-  generatingText.value = '正在创建剧本生成任务...';
   
   try {
     const params = getParamsFromRoute();
     
-    // 调用后端API创建剧本生成任务
-    const response = await axios.post('/api/v1/tasks/script', {
-      video_subject: params.inspiration,
-      template_id: params.templateId || '',
-      style_id: params.styleId || '',
-      video_style: params.styleId || '', // 后端需要的必填字段
-      video_language: 'zh', // 默认中文
-      paragraph_number: 5   // 默认5个段落
-    });
+    let scriptResponse;
     
-    // 获取任务ID
-    const newTaskId = response.data.data.task_id;
-    localStorage.setItem('currentTaskId', newTaskId);
-    
-    // 更新当前任务ID
-    taskId.value = newTaskId;
+    // 检查是否已有任务ID
+    if (taskId.value) {
+      // 如果已有任务ID，调用/script接口进行重新生成
+      generatingText.value = '正在重新生成剧本...';
+      scriptResponse = await axios.post('/api/v1/tasks/script', {
+        task_id: taskId.value, // 带上任务ID以使用之前的参数
+        video_subject: params.inspiration,
+        template_id: params.templateId || '',
+        style_id: params.styleId || '',
+        video_style: params.styleId || '',
+        video_language: 'zh',
+        paragraph_number: 5
+      });
+    } else {
+      // 如果没有任务ID，创建新任务
+      generatingText.value = '正在创建剧本生成任务...';
+      scriptResponse = await axios.post('/api/v1/tasks/script', {
+        video_subject: params.inspiration,
+        template_id: params.templateId || '',
+        style_id: params.styleId || '',
+        video_style: params.styleId || '',
+        video_language: 'zh',
+        paragraph_number: 5
+      });
+      
+      // 获取任务ID
+      const newTaskId = scriptResponse.data.data?.task_id;
+      if (newTaskId) {
+        localStorage.setItem('currentTaskId', newTaskId);
+        taskId.value = newTaskId;
+      }
+    }
     
     generatingText.value = '正在获取剧本内容...';
     
-    // 直接获取任务详情而不是轮询
-    const taskResponse = await axios.get(`/api/v1/tasks/${newTaskId}`);
+    // 直接获取任务详情
+    const taskResponse = await axios.get(`/api/v1/tasks/${taskId.value}`);
     const task = taskResponse.data.data;
     
     if (task && task.script) {
@@ -193,7 +222,8 @@ const generateScript = async () => {
  */
 const saveScript = async () => {
   if (!taskId.value) {
-    alert('任务ID不存在');
+    console.error('任务ID不存在');
+    alert('任务ID不存在，请重新生成剧本');
     return;
   }
   
@@ -203,28 +233,56 @@ const saveScript = async () => {
   }
   
   try {
+    loading.value = true;
+    
     // 调用API保存剧本
     const response = await axios.put(`/api/v1/tasks/${taskId.value}/script`, {
       script: scriptContent.value
     });
     
-    if (response.data.code === 200) {
-      // 更新流程导航组件的任务ID
-      if (flowNavigation.value) {
-        await nextTick();
-        flowNavigation.value.updateTaskId(taskId.value);
+    // 检查响应是否有效
+    if (response && response.data) {
+      if (response.data.code === 200 || response.data.success === true) {
+        // 更新流程导航组件的任务ID
+        if (flowNavigation.value) {
+          await nextTick();
+          flowNavigation.value.updateTaskId(taskId.value);
+        }
+        
+        // 标记剧本完成并保存任务ID到localStorage
+        localStorage.setItem('scriptCompleted', 'true');
+        localStorage.setItem('currentTaskId', taskId.value);
+        
+        console.log('剧本保存成功，任务ID:', taskId.value);
+        
+        // 保存成功不再弹出alert，减少干扰
+        return true; // 返回成功状态
+      } else {
+        const errorMsg = response.data.message || '保存失败，服务器返回错误';
+        console.error('保存失败:', errorMsg);
+        alert(errorMsg);
+        return false;
       }
-      
-      // 标记剧本完成
-      localStorage.setItem('scriptCompleted', 'true');
-      
-      alert('剧本保存成功');
     } else {
-      alert('保存失败: ' + response.data.message);
+      console.error('保存失败: 无效的服务器响应');
+      alert('保存失败，请检查网络连接');
+      return false;
     }
   } catch (error: any) {
     console.error('保存剧本失败:', error);
-    alert('保存失败，请重试: ' + (error.message || ''));
+    
+    // 更友好的错误提示
+    let errorMsg = '保存失败，请重试';
+    if (error.response) {
+      errorMsg += `: ${error.response.status} - ${error.response.statusText}`;
+    } else if (error.message) {
+      errorMsg += `: ${error.message}`;
+    }
+    
+    alert(errorMsg);
+    return false;
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -250,17 +308,25 @@ const nextStep = async () => {
     return;
   }
   
-  // 先保存当前剧本
-  await saveScript();
-  
-  // 跳转到角色场景设计页面
-  router.push({
-    path: '/character-scene',
-    query: {
-      taskId: taskId.value,
-      script: scriptContent.value
-    }
-  });
+  try {
+    // 先保存当前剧本
+    await saveScript();
+    
+    // 保存任务ID到localStorage，确保在后续步骤中能正确获取
+    localStorage.setItem('currentTaskId', taskId.value);
+    
+    // 跳转到角色场景设计页面
+    router.push({
+      path: '/character-scene',
+      query: {
+        taskId: taskId.value,
+        script: encodeURIComponent(scriptContent.value) // 编码剧本内容，避免URL参数问题
+      }
+    });
+  } catch (error) {
+    console.error('进入下一步失败:', error);
+    alert('进入下一步失败，请重试');
+  }
 };
 
 /**

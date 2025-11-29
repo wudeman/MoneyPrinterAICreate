@@ -233,8 +233,9 @@ const loadTaskData = async () => {
     const taskData = response.data.data;
     
     if (taskData) {
-      // 获取剧本内容
-      script.value = taskData.script || (route.query.script as string) || '';
+      // 获取剧本内容，解码URL参数
+      const urlScript = route.query.script ? decodeURIComponent(route.query.script as string) : '';
+      script.value = taskData.script || urlScript || '';
       
       // 如果有已保存的角色场景数据，加载它
       if (taskData.characters) {

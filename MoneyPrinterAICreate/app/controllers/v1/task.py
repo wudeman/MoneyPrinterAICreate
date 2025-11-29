@@ -112,7 +112,7 @@ class TaskController:
         )
     
     @staticmethod
-    @router.post("/tasks/create-and-generate", response_model=ScriptGenerateResponse)
+    @router.post("/tasks/create-and-generate", response_model=TaskResponse)
     async def create_and_generate_script(
         request: Request,
         body: dict,
@@ -127,7 +127,7 @@ class TaskController:
             db: 数据库会话
             
         Returns:
-            ScriptGenerateResponse: 包含任务ID和生成的剧本内容
+            TaskResponse: 包含完整任务信息的响应
         """
         from app.services.template_service import TemplateService
         from app.services.llm_service import llm_service
@@ -135,9 +135,6 @@ class TaskController:
         from app.models.task_model import TaskStatus
         from fastapi import status
         from app.services.llm_model_service import LLMModelService
-        
-        task_id = utils.get_uuid()
-        request_id = base_controller.get_task_id(request)
         
         try:
             # 转换前端请求格式
@@ -197,7 +194,6 @@ class TaskController:
                 prompt += f"\n使用风格ID: {style_id}。"
             
             # 5. 调用模型生成剧本
-            logger.info(f"开始同步生成剧本，任务ID: {task_id}")
             try:
                 # 使用llm_service的generate_text方法同步生成剧本
                 video_script = llm_service.generate_text(
@@ -208,7 +204,6 @@ class TaskController:
                     api_key=default_text_model.api_key,
                     stream=False  # 非流式生成
                 )
-                logger.success(f"剧本同步生成成功，任务ID: {task_id}")
             except Exception as e:
                 logger.error(f"剧本生成失败: {e}")
                 raise HTTPException(
@@ -220,20 +215,24 @@ class TaskController:
             TaskService.save_script_to_task(db, db_task.id, video_script)
             TaskService.update_task_status(db, db_task.id, TaskStatus.SCRIPT_COMPLETED)
             logger.info(f"任务剧本字段更新成功，数据库任务ID: {db_task.id}")
+
             
-            # 7. 更新状态服务中的任务信息
-            state_service.state.update_task(
-                task_id, 
-                db_task_id=db_task.id,
-                script=video_script,
-                state="completed",
-                progress=100
-            )
+            # 8. 构建完整的任务信息
+            task_info = {
+                "task_id": db_task.id,
+                "video_idea": video_idea,
+                "template_id": template_id,
+                "style_id": style_id,
+                "duration": duration,
+                "script": video_script,
+                "status": TaskStatus.SCRIPT_COMPLETED.value
+            }
             
-            # 8. 返回任务ID和生成的剧本内容
-            return ScriptGenerateResponse(
-                task_id=task_id,
-                script=video_script
+            # 9. 返回完整的任务信息
+            return TaskResponse(
+                status=200,
+                message="剧本生成成功",
+                data=task_info
             )
             
         except HTTPException:

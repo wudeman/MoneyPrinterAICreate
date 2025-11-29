@@ -34,7 +34,7 @@ def generate_script(task_id, params, db=None, db_task_id=None, llm_model=None):
             template_id=template_id,
             style_id=style_id,
             duration=duration,
-            llm_model=llm_model
+            video_style=params.video_style if hasattr(params, 'video_style') else ''
         )
     else:
         logger.debug(f"video script: \n{video_script}")
