@@ -366,51 +366,194 @@ class TaskController:
     
     @staticmethod
     @router.put("/tasks/{task_id}/script")
-    async def update_script(task_id: str, request: ScriptUpdateRequest):
+    async def update_script(
+        task_id: int, 
+        request: ScriptUpdateRequest,
+        db: Session = Depends(get_db)
+    ):
         """
-        更新剧本内容
+        更新剧本内容（基于数据库）
         
         Args:
-            task_id: 任务ID
+            task_id: 任务ID（数据库ID）
             request: 剧本更新请求参数
+            db: 数据库会话
             
         Returns:
             dict: 操作结果
         """
+        from app.services.task_service import TaskService
+        from app.models.task_schema import TaskUpdate
+        from app.models.task_model import TaskStatus
+        
         try:
             logger.info(f"更新剧本，任务ID: {task_id}")
             
+            # 验证剧本内容不为空
+            if not request.script or not request.script.strip():
+                raise HTTPException(
+                    status_code=400, 
+                    detail="剧本内容不能为空"
+                )
+            
             # 检查任务是否存在
-            task = state_service.state.get_task(task_id)
-            if not task:
-                raise HTTPException(status_code=404, detail="任务不存在")
+            db_task = TaskService.get_task(db, task_id)
+            if not db_task:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"任务ID {task_id} 不存在"
+                )
             
-            # 更新任务状态中的剧本
-            state_service.state.update_task(task_id, script=request.script)
+            # 更新剧本内容到数据库
+            task_update = TaskUpdate(script=request.script)
+            updated_task = TaskService.update_task(db, task_id, task_update)
             
-            # 保存剧本到文件
-            from app.utils import utils
-            import os
-            import json
-            
-            script_file = os.path.join(utils.task_dir(task_id), "script.json")
-            script_data = {
-                "script": request.script,
-                "search_terms": [],
-                "params": task.get("params", {})
-            }
-            
-            with open(script_file, "w", encoding="utf-8") as f:
-                f.write(json.dumps(script_data, ensure_ascii=False, indent=2))
+            # 更新任务状态为剧本已完成
+            TaskService.update_task_status(db, task_id, TaskStatus.SCRIPT_COMPLETED)
             
             logger.success(f"剧本更新成功，任务ID: {task_id}")
             
-            return {"status": "success", "message": "剧本更新成功"}
+            return utils.get_response(200, {
+                "message": "剧本保存成功",
+                "task_id": task_id,
+                "script": updated_task.script
+            })
+            
         except HTTPException:
             raise
         except Exception as e:
             logger.error(f"更新剧本时发生错误: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"更新剧本失败: {str(e)}")
+            db.rollback()
+            raise HTTPException(
+                status_code=500, 
+                detail=f"更新剧本失败: {str(e)}"
+            )
+    
+    @staticmethod
+    @router.post("/tasks/{task_id}/regenerate-script")
+    async def regenerate_script(
+        task_id: int,
+        db: Session = Depends(get_db)
+    ):
+        """
+        重新生成剧本（基于任务原有参数）
+        
+        Args:
+            task_id: 任务ID（数据库ID）
+            db: 数据库会话
+            
+        Returns:
+            TaskResponse: 包含新剧本的任务信息
+        """
+        from app.services.template_service import TemplateService
+        from app.services.llm_service import llm_service
+        from app.services.task_service import TaskService
+        from app.models.task_model import TaskStatus
+        from app.services.llm_model_service import LLMModelService
+        from app.models.task_schema import TaskUpdate
+        from fastapi import status
+        
+        try:
+            logger.info(f"重新生成剧本，任务ID: {task_id}")
+            
+            # 1. 检查任务是否存在
+            db_task = TaskService.get_task(db, task_id)
+            if not db_task:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"任务ID {task_id} 不存在"
+                )
+            
+            # 2. 更新任务状态为剧本生成中
+            TaskService.update_task_status(db, task_id, TaskStatus.SCRIPT_GENERATING)
+            
+            # 3. 初始化服务
+            template_service = TemplateService()
+            llm_model_service = LLMModelService()
+            
+            # 4. 获取模板配置
+            template = template_service.get_template_by_id(db, db_task.template_id)
+            if not template:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"模板ID {db_task.template_id} 不存在或已停用"
+                )
+            logger.info(f"模板加载成功: {db_task.template_id}")
+            
+            # 5. 获取默认的文本类型大模型配置
+            default_text_model = llm_model_service.get_default_text_model(db)
+            if not default_text_model:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="未找到默认的文本类型大模型，请联系管理员配置"
+                )
+            logger.info(f"使用默认文本模型: {default_text_model.model_name}")
+            
+            # 6. 构建生成剧本的提示词
+            prompt = template.script_prompt
+            prompt += f"\n视频创意：'{db_task.video_idea}'"
+            if db_task.duration:
+                prompt += f"\n视频时长约为 {db_task.duration} 秒。"
+            if db_task.style_id:
+                prompt += f"\n使用风格ID: {db_task.style_id}。"
+            
+            # 7. 调用模型生成剧本
+            try:
+                logger.info("开始调用LLM生成剧本...")
+                video_script = llm_service.generate_text(
+                    prompt=prompt,
+                    provider=default_text_model.model_provider,
+                    model_name=default_text_model.model_name,
+                    base_url=default_text_model.base_url,
+                    api_key=default_text_model.api_key,
+                    stream=False  # 非流式生成
+                )
+                logger.info("剧本生成成功")
+            except Exception as e:
+                logger.error(f"剧本生成失败: {e}")
+                # 更新任务状态为失败
+                TaskService.update_task_status(db, task_id, TaskStatus.SCRIPT_FAILED)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"剧本生成失败: {str(e)}"
+                )
+            
+            # 8. 更新剧本字段到数据库
+            TaskService.save_script_to_task(db, task_id, video_script)
+            TaskService.update_task_status(db, task_id, TaskStatus.SCRIPT_COMPLETED)
+            logger.info(f"任务剧本字段更新成功，数据库任务ID: {task_id}")
+            
+            # 9. 构建完整的任务信息
+            task_info = {
+                "task_id": db_task.id,
+                "video_idea": db_task.video_idea,
+                "template_id": db_task.template_id,
+                "style_id": db_task.style_id,
+                "duration": db_task.duration,
+                "script": video_script,
+                "status": TaskStatus.SCRIPT_COMPLETED.value
+            }
+            
+            # 10. 返回完整的任务信息
+            return TaskResponse(
+                status=200,
+                message="剧本重新生成成功",
+                data=task_info
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            # 记录详细错误信息
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"重新生成剧本时发生错误: {str(e)}")
+            logger.error(f"错误堆栈: {error_trace}")
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"重新生成剧本失败: {str(e)}"
+            )
     
     @staticmethod
     @router.get("/tasks/{task_id}")
@@ -439,6 +582,194 @@ class TaskController:
         except Exception as e:
             logger.error(f"获取任务状态时发生错误: {str(e)}")
             raise HTTPException(status_code=500, detail=f"获取任务状态失败: {str(e)}")
+    
+    @staticmethod
+    @router.post("/tasks/{task_id}/generate-characters", response_model=TaskResponse)
+    async def generate_characters(
+        task_id: int,
+        db: Session = Depends(get_db)
+    ):
+        """
+        生成角色列表
+        
+        Args:
+            task_id: 任务ID（数据库ID）
+            db: 数据库会话
+            
+        Returns:
+            TaskResponse: 包含角色列表的任务信息
+        """
+        from app.services.template_service import TemplateService
+        from app.services.llm_service import llm_service
+        from app.services.task_service import TaskService
+        from app.models.task_model import TaskStatus
+        from app.services.llm_model_service import LLMModelService
+        from app.models.task_schema import TaskUpdate
+        from fastapi import status
+        
+        try:
+            logger.info(f"生成角色列表，任务ID: {task_id}")
+            
+            # 1. 检查任务是否存在
+            db_task = TaskService.get_task(db, task_id)
+            if not db_task:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"任务ID {task_id} 不存在"
+                )
+            
+            # 2. 检查任务是否有剧本内容
+            if not db_task.script:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="任务缺少剧本内容，请先生成剧本"
+                )
+            
+            # 3. 初始化服务
+            template_service = TemplateService()
+            llm_model_service = LLMModelService()
+            
+            # 4. 获取模板配置
+            template = template_service.get_template_by_id(db, db_task.template_id)
+            if not template:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"模板ID {db_task.template_id} 不存在或已停用"
+                )
+            logger.info(f"模板加载成功: {db_task.template_id}")
+            
+            # 5. 检查模板是否有角色生成提示词
+            if not template.character_prompt:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="模板缺少角色生成提示词"
+                )
+            
+            # 6. 获取默认的文本类型大模型配置
+            default_text_model = llm_model_service.get_default_text_model(db)
+            if not default_text_model:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="未找到默认的文本类型大模型，请联系管理员配置"
+                )
+            logger.info(f"使用默认文本模型: {default_text_model.model_name}")
+            
+            # 7. 构建生成角色列表的提示词
+            prompt = template.character_prompt
+            prompt += f"\n剧本内容：\n{db_task.script}"
+            
+            # 8. 调用模型生成角色列表
+            try:
+                logger.info("开始调用LLM生成角色列表...")
+                character_response = llm_service.generate_text(
+                    prompt=prompt,
+                    provider=default_text_model.model_provider,
+                    model_name=default_text_model.model_name,
+                    base_url=default_text_model.base_url,
+                    api_key=default_text_model.api_key,
+                    stream=False  # 非流式生成
+                )
+                logger.info("角色列表生成成功")
+            except Exception as e:
+                logger.error(f"角色列表生成失败: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"角色列表生成失败: {str(e)}"
+                )
+            
+            # 9. 解析角色列表响应（假设LLM返回JSON格式的角色列表）
+            try:
+                import json
+                character_list = json.loads(character_response)
+                # 确保是列表格式
+                if not isinstance(character_list, list):
+                    character_list = [character_list]
+            except json.JSONDecodeError:
+                # 如果不是JSON格式，尝试按行分割
+                character_lines = character_response.strip().split('\n')
+                character_list = []
+                for line in character_lines:
+                    line = line.strip()
+                    if line and ':' in line:
+                        parts = line.split(':', 1)
+                        character_list.append({
+                            "character_name": parts[0].strip(),
+                            "brief_description": parts[1].strip()
+                        })
+                    elif line:
+                        character_list.append({
+                            "character_name": line,
+                            "brief_description": ""
+                        })
+            
+            # 10. 更新角色列表到数据库
+            task_update = TaskUpdate(character_list=character_list)
+            updated_task = TaskService.update_task(db, task_id, task_update)
+            logger.info(f"任务角色列表更新成功，数据库任务ID: {task_id}")
+            
+            # 11. 构建完整的任务信息
+            # 转换角色列表格式以匹配响应模型
+            formatted_character_list = []
+            for char in character_list:
+                if isinstance(char, dict):
+                    formatted_character_list.append({
+                        "character_name": char.get("character_name", "未知角色"),
+                        "brief_description": char.get("brief_description", ""),
+                        "appearance_description": char.get("appearance_description", ""),
+                        "recommended_voice": char.get("recommended_voice", ""),
+                        "character_image_url": char.get("character_image_url", "")
+                    })
+                else:
+                    formatted_character_list.append({
+                        "character_name": str(char),
+                        "brief_description": "",
+                        "appearance_description": "",
+                        "recommended_voice": "",
+                        "character_image_url": ""
+                    })
+            
+            task_info = {
+                "task_id": updated_task.id,
+                "video_idea": updated_task.video_idea,
+                "template_id": updated_task.template_id,
+                "style_id": updated_task.style_id,
+                "aspect_ratio": updated_task.aspect_ratio,
+                "duration": updated_task.duration,
+                "bgm": updated_task.bgm,
+                "script": updated_task.script,
+                "character_list": formatted_character_list,
+                "scene_list": updated_task.scene_list,
+                "storyboard_list": updated_task.storyboard_list,
+                "storyboard_frame_list": updated_task.storyboard_frame_list,
+                "storyboard_video_list": updated_task.storyboard_video_list,
+                "voice_list": updated_task.voice_list,
+                "sound_effect_list": updated_task.sound_effect_list,
+                "status": TaskStatus(updated_task.status),
+                "operator": updated_task.operator,
+                "created_at": updated_task.created_at,
+                "updated_at": updated_task.updated_at
+            }
+            
+            # 12. 返回完整的任务信息
+            return TaskResponse(
+                status=200,
+                message="角色生成成功",
+                data=task_info
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            # 记录详细错误信息
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"生成角色列表时发生错误: {str(e)}")
+            logger.error(f"错误堆栈: {error_trace}")
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"生成角色列表失败: {str(e)}"
+            )
     
     @staticmethod
     @router.post("/tasks/{task_id}/storyboards")

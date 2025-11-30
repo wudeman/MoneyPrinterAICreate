@@ -9,6 +9,8 @@ from app.services.llm_engine.base import BaseLLM
 from app.services.llm_engine.openai import OpenAILLM
 from app.services.llm_engine.deepseek import DeepSeekLLM
 from app.services.llm_engine.azure_openai import AzureOpenAILLM
+from app.services.llm_engine.jianmeng_text2image import JianMengText2ImageLLM
+from app.services.llm_engine.jianmeng_img2video import JianMengImg2VideoLLM
 
 
 class LLMFactory:
@@ -21,7 +23,9 @@ class LLMFactory:
     _llm_registry: Dict[str, type] = {
         "openai": OpenAILLM,
         "deepseek": DeepSeekLLM,
-        "azure": AzureOpenAILLM
+        "azure": AzureOpenAILLM,
+        "jianmeng_text2image": JianMengText2ImageLLM,
+        "jianmeng_img2video": JianMengImg2VideoLLM
     }
     
     # 单例实例缓存
@@ -119,6 +123,24 @@ class LLMFactory:
                 "base_url": kwargs.get("base_url", "https://api.deepseek.com"),
                 "api_key": kwargs.get("api_key", ""),
                 "temperature": kwargs.get("temperature", 0.7),
+            }
+        elif provider == "jianmeng_text2image":
+            # 即梦AI文生图默认配置
+            config = {
+                "model_name": kwargs.get("model_name", "jimeng-img-gen-v3"),
+                "access_key_id": kwargs.get("access_key_id", ""),
+                "secret_access_key": kwargs.get("secret_access_key", ""),
+                "region": kwargs.get("region", "cn-north-1"),
+                "api_version": kwargs.get("api_version", "2020-08-26"),
+            }
+        elif provider == "jianmeng_img2video":
+            # 即梦AI图生视频默认配置
+            config = {
+                "model_name": kwargs.get("model_name", "jimeng-video-gen-v3"),
+                "access_key_id": kwargs.get("access_key_id", ""),
+                "secret_access_key": kwargs.get("secret_access_key", ""),
+                "region": kwargs.get("region", "cn-north-1"),
+                "api_version": kwargs.get("api_version", "2020-08-26"),
             }
         
         # 使用用户传入的参数覆盖默认值

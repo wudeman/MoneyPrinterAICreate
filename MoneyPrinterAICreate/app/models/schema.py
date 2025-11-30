@@ -222,16 +222,8 @@ class VideoTermsRequest(VideoTermsParams, BaseModel):
 ######################################################################################################
 ######################################################################################################
 class TaskResponse(BaseResponse):
-    class TaskResponseData(BaseModel):
-        task_id: Optional[int] = None
-        video_idea: Optional[str] = None
-        template_id: Optional[int] = None
-        style_id: Optional[int] = None
-        duration: Optional[int] = None
-        script: Optional[str] = None
-        status: Optional[int] = None
         
-    data: TaskResponseData
+    data: Any = None
 
     class Config:
         json_schema_extra = {
